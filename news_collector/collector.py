@@ -6,33 +6,23 @@ import argparse
 import hashlib
 import json
 import os
-import random
 import sys
-import time
 import urllib.request
-from collections.abc import Callable
+
 from datetime import date, datetime, timedelta
-from typing import TypeVar
 
 from google import genai
 from google.genai import types
 from pydantic import BaseModel, Field
 
 from news_collector.models import Article
+from news_collector.retry import call_with_retry
 from news_collector.storage import Storage
 from news_collector.topics import Topic, load_topics, topic_from_genre
-
-_T = TypeVar("_T")
-
-# Retry settings for 429 / RESOURCE_EXHAUSTED
-_MAX_RETRIES = 5
-_RETRY_BASE_DELAY = 5.0
-
 
 # ──────────────────────────────────────────────
 # Response models for structured extraction
 # ──────────────────────────────────────────────
-
 
 class _NewsItem(BaseModel):
     """A single news article discovered by search."""
@@ -45,12 +35,10 @@ class _NewsItem(BaseModel):
     )
     summary: str = Field(description="Brief summary of the article content (2-3 sentences)")
 
-
 class _NewsSearchResult(BaseModel):
     """Collection of news articles from a search."""
 
     articles: list[_NewsItem] = Field(description="List of discovered news articles")
-
 
 # ──────────────────────────────────────────────
 # Prompts
@@ -75,7 +63,6 @@ Requirements:
 - If a publication date is uncertain, set it to null
 """
 
-
 def _build_search_prompt(
     genre: str, from_date: str, to_date: str, keywords: list[str] | None = None
 ) -> str:
@@ -96,43 +83,12 @@ def _build_search_prompt(
     )
     return "\n".join(parts)
 
-
-# ──────────────────────────────────────────────
-# Retry logic
-# ──────────────────────────────────────────────
-
-
-def _is_rate_limit(exc: Exception) -> bool:
-    msg = str(exc).lower()
-    return "429" in msg or "resource_exhausted" in msg
-
-
-def _call_with_retry(fn: Callable[[], _T], label: str = "") -> _T:
-    for attempt in range(_MAX_RETRIES):
-        try:
-            return fn()
-        except Exception as e:
-            if _is_rate_limit(e) and attempt < _MAX_RETRIES - 1:
-                delay = _RETRY_BASE_DELAY * (2**attempt) + random.uniform(0, 1)
-                tag = f" [{label}]" if label else ""
-                print(
-                    f"\n  Rate limited (429){tag} — retrying in {delay:.1f}s "
-                    f"({attempt + 1}/{_MAX_RETRIES - 1})",
-                    file=sys.stderr,
-                )
-                time.sleep(delay)
-                continue
-            raise
-    raise RuntimeError("unreachable")
-
-
 # ──────────────────────────────────────────────
 # Client factory
 # ──────────────────────────────────────────────
 
 _SEARCH_MODEL = "gemini-2.5-pro"
 _EXTRACTION_MODEL = "gemini-2.5-pro"
-
 
 def _make_client() -> genai.Client:
     return genai.Client(
@@ -141,11 +97,9 @@ def _make_client() -> genai.Client:
         location=os.environ.get("GOOGLE_CLOUD_LOCATION", "us-central1"),
     )
 
-
 # ──────────────────────────────────────────────
 # Phase 1: Search + extract
 # ──────────────────────────────────────────────
-
 
 def run_collect(args: argparse.Namespace) -> None:
     """Entry point for the collect subcommand."""
@@ -195,7 +149,6 @@ def run_collect(args: argparse.Namespace) -> None:
         )
     finally:
         storage.close()
-
 
 def search_news(
     genre: str,
@@ -262,7 +215,6 @@ def search_news(
         )
     return articles
 
-
 def _search_with_grounding(
     client: genai.Client,
     genre: str,
@@ -321,8 +273,7 @@ def _search_with_grounding(
                 unique_urls.append(u)
         return "".join(parts), unique_urls
 
-    return _call_with_retry(_run, "search")
-
+    return call_with_retry(_run, "search")
 
 def _extract_articles(
     client: genai.Client,
@@ -356,8 +307,7 @@ def _extract_articles(
         result = _NewsSearchResult(**data)
         return result.articles
 
-    return _call_with_retry(_run, "extract")
-
+    return call_with_retry(_run, "extract")
 
 def _resolve_redirect(url: str, timeout: float = 5.0) -> str:
     """Resolve a Vertex AI grounding redirect URL to the actual source URL.
@@ -386,7 +336,6 @@ def _resolve_redirect(url: str, timeout: float = 5.0) -> str:
     except Exception:
         return url
 
-
 def _resolve_urls_batch(urls: list[str], verbose: bool = False) -> dict[str, str]:
     """Resolve a list of redirect URLs. Returns a mapping old → resolved."""
     mapping: dict[str, str] = {}
@@ -396,7 +345,6 @@ def _resolve_urls_batch(urls: list[str], verbose: bool = False) -> dict[str, str
         if verbose and resolved != url:
             print(f"    [resolved] {resolved}", file=sys.stderr)
     return mapping
-
 
 def _article_id(url: str) -> str:
     """Generate a deterministic article ID from a URL."""

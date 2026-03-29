@@ -5,32 +5,24 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import random
 import sys
-import time
-from collections.abc import Callable
+
 from datetime import datetime
-from typing import TypeVar
 
 from google import genai
 from google.genai import types
 from pydantic import BaseModel, Field
 
 from news_collector.models import Translation
+from news_collector.retry import call_with_retry
 from news_collector.storage import Storage
 from news_collector.topics import load_config
 
-_T = TypeVar("_T")
-
-_MAX_RETRIES = 5
-_RETRY_BASE_DELAY = 5.0
 _FLASH_MODEL = "gemini-2.5-flash"
-
 
 # ──────────────────────────────────────────────
 # Response model
 # ──────────────────────────────────────────────
-
 
 class _ProcessingResult(BaseModel):
     """Structured output from the tagging and summarization step."""
@@ -44,7 +36,6 @@ class _ProcessingResult(BaseModel):
         description="Concise summary of the article in 2-4 sentences. "
         "Include: what happened, who was affected, and why it matters."
     )
-
 
 # ──────────────────────────────────────────────
 # Prompt
@@ -68,40 +59,9 @@ summary, produce:
 Be factual. Do not speculate beyond what the input states.
 """
 
-
-# ──────────────────────────────────────────────
-# Retry logic (same pattern as collector)
-# ──────────────────────────────────────────────
-
-
-def _is_rate_limit(exc: Exception) -> bool:
-    msg = str(exc).lower()
-    return "429" in msg or "resource_exhausted" in msg
-
-
-def _call_with_retry(fn: Callable[[], _T], label: str = "") -> _T:
-    for attempt in range(_MAX_RETRIES):
-        try:
-            return fn()
-        except Exception as e:
-            if _is_rate_limit(e) and attempt < _MAX_RETRIES - 1:
-                delay = _RETRY_BASE_DELAY * (2**attempt) + random.uniform(0, 1)
-                tag = f" [{label}]" if label else ""
-                print(
-                    f"\n  Rate limited (429){tag} — retrying in {delay:.1f}s "
-                    f"({attempt + 1}/{_MAX_RETRIES - 1})",
-                    file=sys.stderr,
-                )
-                time.sleep(delay)
-                continue
-            raise
-    raise RuntimeError("unreachable")
-
-
 # ──────────────────────────────────────────────
 # Client factory
 # ──────────────────────────────────────────────
-
 
 def _make_client() -> genai.Client:
     return genai.Client(
@@ -110,11 +70,9 @@ def _make_client() -> genai.Client:
         location=os.environ.get("GOOGLE_CLOUD_LOCATION", "us-central1"),
     )
 
-
 # ──────────────────────────────────────────────
 # Core processing
 # ──────────────────────────────────────────────
-
 
 def generate_tags_and_summary(
     client: genai.Client, title: str, raw_summary: str
@@ -138,8 +96,7 @@ def generate_tags_and_summary(
         result = _ProcessingResult(**data)
         return result.tags, result.summary
 
-    return _call_with_retry(_run, "process")
-
+    return call_with_retry(_run, "process")
 
 # ──────────────────────────────────────────────
 # Translation
@@ -156,13 +113,11 @@ _LANG_NAMES: dict[str, str] = {
     "pt": "Portuguese",
 }
 
-
 class _TranslationResult(BaseModel):
     """Structured output from the translation step."""
 
     title: str = Field(description="Translated article title")
     summary: str = Field(description="Translated article summary")
-
 
 def translate_article(
     client: genai.Client, title: str, summary: str, lang: str
@@ -193,13 +148,59 @@ def translate_article(
         result = _TranslationResult(**data)
         return result.title, result.summary
 
-    return _call_with_retry(_run, f"translate-{lang}")
+    return call_with_retry(_run, f"translate-{lang}")
 
+# ──────────────────────────────────────────────
+# Curation (analyst commentary)
+# ──────────────────────────────────────────────
+
+class _CurationResult(BaseModel):
+    """Structured output from the curation step."""
+
+    commentary: str = Field(
+        description="A concise analyst commentary on the article (2-3 sentences). "
+        "Provide context, significance, and actionable insight."
+    )
+
+def generate_commentary(
+    client: genai.Client, title: str, summary: str, tags: list[str], lang: str = ""
+) -> str:
+    """Generate an analyst commentary for a single article using Gemini Flash."""
+    lang_name = _LANG_NAMES.get(lang, "English") if lang else "English"
+    tag_str = ", ".join(tags) if tags else "general"
+
+    def _run() -> str:
+        response = client.models.generate_content(
+            model=_FLASH_MODEL,
+            contents=(
+                f"Article title: {title}\n"
+                f"Summary: {summary}\n"
+                f"Tags: {tag_str}"
+            ),
+            config=types.GenerateContentConfig(
+                system_instruction=(
+                    f"You are an experienced cybersecurity analyst providing "
+                    f"brief commentary on news articles for a security team's Slack channel. "
+                    f"Write in {lang_name}.\n\n"
+                    f"For each article, provide a 2-3 sentence commentary that:\n"
+                    f"- Explains why this matters to security practitioners\n"
+                    f"- Adds context that isn't obvious from the headline\n"
+                    f"- Suggests a concrete action or takeaway when appropriate\n\n"
+                    f"Be direct, professional, and insightful. No filler."
+                ),
+                response_mime_type="application/json",
+                response_schema=_CurationResult,
+            ),
+        )
+        data = json.loads(response.text)
+        result = _CurationResult(**data)
+        return result.commentary
+
+    return call_with_retry(_run, "curate")
 
 # ──────────────────────────────────────────────
 # Entry point
 # ──────────────────────────────────────────────
-
 
 def run_process(args: argparse.Namespace) -> None:
     """Entry point for the process subcommand."""
