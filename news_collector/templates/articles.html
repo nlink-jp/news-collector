@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block title %}Articles ({{ total }}) — news-collector{% endblock %}
+{% block content %}
+<h1 style="margin-bottom: 20px;">Articles <span style="color: #9da3b0; font-size: 18px;">({{ total }})</span></h1>
+
+<form class="filters" method="get" action="/articles">
+  <select name="genre">
+    <option value="">All topics</option>
+    {% for g in all_genres %}
+    <option value="{{ g }}" {{ 'selected' if g == genre }}>{{ g }}</option>
+    {% endfor %}
+  </select>
+  <input type="text" name="tag" value="{{ tag }}" placeholder="Filter by tag...">
+  <input type="text" name="q" value="{{ q }}" placeholder="Search title/summary...">
+  {% if all_langs %}
+  <select name="lang">
+    <option value="">Original language</option>
+    {% for l in all_langs %}
+    <option value="{{ l }}" {{ 'selected' if l == lang }}>{{ l }}</option>
+    {% endfor %}
+  </select>
+  {% endif %}
+  <button type="submit">Filter</button>
+  {% if genre or tag or q or lang %}
+  <a href="/articles" style="font-size: 13px;">Clear</a>
+  {% endif %}
+</form>
+
+{% for article in articles %}
+<div class="card article-item">
+  <h3>
+    <a href="/articles/{{ article.id }}">
+      {% if lang and lang in article.translations %}
+        {{ article.translations[lang].title }}
+      {% else %}
+        {{ article.title }}
+      {% endif %}
+    </a>
+  </h3>
+  <div class="article-meta">
+    <span>{{ article.source }}</span>
+    {% if article.published_date %}<span>{{ article.published_date }}</span>{% endif %}
+    <span class="tag" style="font-size: 11px;">{{ article.genre }}</span>
+  </div>
+  <div class="article-summary">
+    {% if lang and lang in article.translations %}
+      {{ article.translations[lang].summary }}
+    {% elif article.summary %}
+      {{ article.summary }}
+    {% else %}
+      {{ article.summary_raw[:200] }}{% if article.summary_raw|length > 200 %}...{% endif %}
+    {% endif %}
+  </div>
+  {% if article.tags %}
+  <div class="article-tags">
+    {% for tag in article.tags %}
+    <a href="/articles?tag={{ tag }}" class="tag">{{ tag }}</a>
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>
+{% endfor %}
+
+{% if not articles %}
+<div class="card" style="text-align: center; color: #9da3b0; padding: 40px;">
+  No articles found.
+</div>
+{% endif %}
+
+{% if total_pages > 1 %}
+<div class="pagination">
+  {% if page > 1 %}
+  <a href="/articles?page={{ page - 1 }}&genre={{ genre }}&tag={{ tag }}&q={{ q }}&lang={{ lang }}">&laquo; Prev</a>
+  {% endif %}
+  {% for p in range(1, total_pages + 1) %}
+    {% if p == page %}
+    <span class="current">{{ p }}</span>
+    {% elif p <= 3 or p > total_pages - 2 or (p >= page - 1 and p <= page + 1) %}
+    <a href="/articles?page={{ p }}&genre={{ genre }}&tag={{ tag }}&q={{ q }}&lang={{ lang }}">{{ p }}</a>
+    {% elif p == 4 or p == total_pages - 2 %}
+    <span style="color: #9da3b0;">...</span>
+    {% endif %}
+  {% endfor %}
+  {% if page < total_pages %}
+  <a href="/articles?page={{ page + 1 }}&genre={{ genre }}&tag={{ tag }}&q={{ q }}&lang={{ lang }}">Next &raquo;</a>
+  {% endif %}
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — news-collector{% endblock %}
+{% block content %}
+<h1 style="margin-bottom: 20px;">Dashboard</h1>
+
+<div class="stats">
+  <div class="card stat-card">
+    <div class="number">{{ total }}</div>
+    <div class="label">Total Articles</div>
+  </div>
+  <div class="card stat-card">
+    <div class="number">{{ tagged }}</div>
+    <div class="label">Tagged &amp; Summarized</div>
+  </div>
+  <div class="card stat-card">
+    <div class="number">{{ genres|length }}</div>
+    <div class="label">Topics</div>
+  </div>
+  <div class="card stat-card">
+    <div class="number">{{ top_tags|length }}</div>
+    <div class="label">Unique Tags</div>
+  </div>
+</div>
+
+<div class="grid-2">
+  <div class="card">
+    <h2 style="margin-bottom: 12px; font-size: 16px; color: #9da3b0;">Articles by Date</h2>
+    <table>
+      <tr><th>Date</th><th>Count</th><th></th></tr>
+      {% for date, count in dates %}
+      <tr>
+        <td>{{ date }}</td>
+        <td>{{ count }}</td>
+        <td><span class="bar" style="width: {{ (count / (dates|map(attribute=1)|max if dates else 1)) * 200 }}px;"></span></td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-bottom: 12px; font-size: 16px; color: #9da3b0;">Topics</h2>
+    <table>
+      <tr><th>Genre</th><th>Articles</th></tr>
+      {% for genre, count in genres %}
+      <tr>
+        <td><a href="/articles?genre={{ genre }}">{{ genre }}</a></td>
+        <td>{{ count }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+</div>
+
+<div class="card" style="margin-top: 16px;">
+  <h2 style="margin-bottom: 12px; font-size: 16px; color: #9da3b0;">Top Tags</h2>
+  <div class="tag-cloud">
+    {% for tag, count in top_tags %}
+    <a href="/articles?tag={{ tag }}" class="tag">{{ tag }}<span class="count">({{ count }})</span></a>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

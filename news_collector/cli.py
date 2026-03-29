@@ -56,6 +56,12 @@ examples:
     )
     process_parser.add_argument("--verbose", "-v", action="store_true", help="Show detailed progress")
 
+    # serve
+    serve_parser = subparsers.add_parser("serve", help="Start the web UI")
+    serve_parser.add_argument("--db", default="news.db", help="SQLite database path (default: news.db)")
+    serve_parser.add_argument("--host", default="127.0.0.1", help="Bind address (default: 127.0.0.1)")
+    serve_parser.add_argument("--port", "-p", type=int, default=8080, help="Port (default: 8080)")
+
     args = parser.parse_args()
 
     if args.command is None:
@@ -68,6 +74,13 @@ examples:
     elif args.command == "process":
         from news_collector.processor import run_process
         run_process(args)
+    elif args.command == "serve":
+        from news_collector.web import create_app
+        import uvicorn
+        app = create_app(args.db)
+        print(f"Starting web UI at http://{args.host}:{args.port}", file=sys.stderr)
+        print(f"Database: {args.db}", file=sys.stderr)
+        uvicorn.run(app, host=args.host, port=args.port, log_level="warning")
 
 
 if __name__ == "__main__":

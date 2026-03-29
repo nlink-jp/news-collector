@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}news-collector{% endblock %}</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <script>
+    (function() {
+      var t = localStorage.getItem('theme');
+      if (t) document.documentElement.setAttribute('data-theme', t);
+    })();
+  </script>
+</head>
+<body>
+  <nav>
+    <div class="container">
+      <span class="logo">news-collector</span>
+      <a href="/" class="nav-link">Dashboard</a>
+      <a href="/articles" class="nav-link">Articles</a>
+      <button class="theme-toggle" onclick="toggleTheme()" title="Toggle light/dark mode">
+        <span id="theme-icon">&#9790;</span>
+      </button>
+    </div>
+  </nav>
+  <div class="container">
+    {% block content %}{% endblock %}
+  </div>
+  <script>
+    function toggleTheme() {
+      var el = document.documentElement;
+      var current = el.getAttribute('data-theme');
+      var next = current === 'dark' ? 'light' : 'dark';
+      if (!current) {
+        next = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'light' : 'dark';
+      }
+      el.setAttribute('data-theme', next);
+      localStorage.setItem('theme', next);
+      updateIcon(next);
+    }
+    function updateIcon(theme) {
+      var icon = document.getElementById('theme-icon');
+      if (!icon) return;
+      icon.textContent = theme === 'dark' ? '\u263E' : '\u2600';
+    }
+    (function() {
+      var t = localStorage.getItem('theme') ||
+        (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+      updateIcon(t);
+    })();
+  </script>
+</body>
+</html>

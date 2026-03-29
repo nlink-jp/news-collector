@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}{{ article.title }} — news-collector{% endblock %}
+{% block content %}
+<div style="margin-bottom: 12px;">
+  <a href="/articles" style="font-size: 14px;">&larr; Back to articles</a>
+</div>
+
+<div class="card detail-header">
+  <h1>{{ article.title }}</h1>
+  <div class="article-meta" style="margin-top: 8px;">
+    <span>{{ article.source }}</span>
+    {% if article.published_date %}<span>{{ article.published_date }}</span>{% endif %}
+    <span class="tag" style="font-size: 11px;">{{ article.genre }}</span>
+  </div>
+  {% if article.url %}
+  <div style="margin-top: 8px;">
+    <a href="{{ article.url }}" target="_blank" rel="noopener" style="font-size: 14px;">{{ article.url }}</a>
+  </div>
+  {% endif %}
+</div>
+
+{% if article.tags %}
+<div class="card detail-section">
+  <h2>Tags</h2>
+  <div class="article-tags" style="margin-top: 8px;">
+    {% for tag in article.tags %}
+    <a href="/articles?tag={{ tag }}" class="tag">{{ tag }}</a>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+{% if article.summary %}
+<div class="card detail-section">
+  <h2>Summary</h2>
+  <p>{{ article.summary }}</p>
+</div>
+{% endif %}
+
+{% if article.translations %}
+<div class="card detail-section">
+  <h2>Translations</h2>
+  {% for lang, trans in article.translations.items() %}
+  <div class="translation-block">
+    <div class="lang-label">{{ lang }}</div>
+    <h3 style="font-size: 16px; margin-bottom: 8px;">{{ trans.title }}</h3>
+    <p style="font-size: 14px; color: #9da3b0;">{{ trans.summary }}</p>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<div class="card detail-section">
+  <h2>Raw Collection Data</h2>
+  <p style="font-size: 14px; color: #9da3b0;">{{ article.summary_raw }}</p>
+  <div style="margin-top: 12px; font-size: 12px; color: #666;">
+    <span>Collected: {{ article.collected_at }}</span>
+    {% if article.processed_at %}<span style="margin-left: 16px;">Processed: {{ article.processed_at }}</span>{% endif %}
+    <span style="margin-left: 16px;">ID: {{ article.id }}</span>
+  </div>
+</div>
+{% endblock %}
