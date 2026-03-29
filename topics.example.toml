@@ -3,6 +3,10 @@
 ##
 ## Usage:
 ##   news-collector collect --topics topics.toml
+##   news-collector process --topics topics.toml
+
+## Target languages for translation (applied during 'process')
+languages = ["ja"]
 
 [[topics]]
 name = "cybersecurity"

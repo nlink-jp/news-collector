@@ -21,3 +21,19 @@ class Article(BaseModel):
     tags: list[str] = Field(default_factory=list, description="Auto-generated tags")
     summary: str = Field(default="", description="Gemini Flash summary")
     processed_at: datetime | None = Field(default=None, description="Processing timestamp")
+
+    # Populated by get methods when translations are loaded
+    translations: dict[str, "Translation"] = Field(
+        default_factory=dict,
+        description="Translations keyed by language code",
+    )
+
+
+class Translation(BaseModel):
+    """A translated title and summary for a specific language."""
+
+    article_id: str = Field(description="Parent article ID")
+    lang: str = Field(description="Language code (e.g. ja, ko, zh)")
+    title: str = Field(description="Translated title")
+    summary: str = Field(description="Translated summary")
+    translated_at: datetime = Field(description="Translation timestamp")

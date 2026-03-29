@@ -6,7 +6,7 @@ import json
 import sqlite3
 from pathlib import Path
 
-from news_collector.models import Article
+from news_collector.models import Article, Translation
 
 _SCHEMA = """\
 CREATE TABLE IF NOT EXISTS articles (
@@ -22,6 +22,16 @@ CREATE TABLE IF NOT EXISTS articles (
     summary        TEXT NOT NULL DEFAULT '',
     processed_at   TEXT
 );
+
+CREATE TABLE IF NOT EXISTS translations (
+    article_id    TEXT NOT NULL,
+    lang          TEXT NOT NULL,
+    title         TEXT NOT NULL,
+    summary       TEXT NOT NULL,
+    translated_at TEXT NOT NULL,
+    PRIMARY KEY (article_id, lang),
+    FOREIGN KEY (article_id) REFERENCES articles(id)
+);
 """
 
 
@@ -31,7 +41,7 @@ class Storage:
     def __init__(self, db_path: str, jsonl_path: str | None = None) -> None:
         self._db = sqlite3.connect(db_path)
         self._db.row_factory = sqlite3.Row
-        self._db.execute(_SCHEMA)
+        self._db.executescript(_SCHEMA)
         self._db.commit()
         self._jsonl_path = jsonl_path
 
@@ -106,6 +116,56 @@ class Storage:
             (json.dumps(tags, ensure_ascii=False), summary, processed_at, article_id),
         )
         self._db.commit()
+
+    # ── Translation operations ──
+
+    def upsert_translation(self, translation: Translation) -> None:
+        """Insert or update a translation."""
+        self._db.execute(
+            "INSERT INTO translations (article_id, lang, title, summary, translated_at) "
+            "VALUES (?, ?, ?, ?, ?) "
+            "ON CONFLICT(article_id, lang) DO UPDATE SET "
+            "title = excluded.title, summary = excluded.summary, translated_at = excluded.translated_at",
+            (
+                translation.article_id,
+                translation.lang,
+                translation.title,
+                translation.summary,
+                translation.translated_at.isoformat(),
+            ),
+        )
+        self._db.commit()
+
+    def get_untranslated(
+        self, lang: str, from_date: str | None = None, to_date: str | None = None
+    ) -> list[Article]:
+        """Return processed articles that have no translation for the given language."""
+        query = (
+            "SELECT a.* FROM articles a "
+            "WHERE a.processed_at IS NOT NULL "
+            "AND NOT EXISTS ("
+            "  SELECT 1 FROM translations t WHERE t.article_id = a.id AND t.lang = ?"
+            ")"
+        )
+        params: list[str] = [lang]
+        if from_date:
+            query += " AND a.collected_at >= ?"
+            params.append(from_date)
+        if to_date:
+            query += " AND a.collected_at <= ?"
+            params.append(to_date + "T23:59:59")
+        rows = self._db.execute(query, params).fetchall()
+        return [self._row_to_article(r) for r in rows]
+
+    def get_translations(self, article_id: str) -> dict[str, Translation]:
+        """Return all translations for an article, keyed by language."""
+        rows = self._db.execute(
+            "SELECT * FROM translations WHERE article_id = ?", (article_id,)
+        ).fetchall()
+        return {
+            row["lang"]: Translation(**dict(row))
+            for row in rows
+        }
 
     @staticmethod
     def _row_to_article(row: sqlite3.Row) -> Article:

@@ -46,6 +46,14 @@ examples:
     process_parser.add_argument("--to", dest="to_date", help="End date filter (YYYY-MM-DD)")
     process_parser.add_argument("--db", default="news.db", help="SQLite database path (default: news.db)")
     process_parser.add_argument("--force", action="store_true", help="Re-process already processed articles")
+    process_parser.add_argument(
+        "--topics", "-t", metavar="FILE",
+        help="TOML file with languages config (reads 'languages' field)",
+    )
+    process_parser.add_argument(
+        "--languages", "-l", default=None,
+        help="Comma-separated target languages for translation (e.g. ja,ko)",
+    )
     process_parser.add_argument("--verbose", "-v", action="store_true", help="Show detailed progress")
 
     args = parser.parse_args()

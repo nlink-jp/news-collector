@@ -16,7 +16,9 @@ from google import genai
 from google.genai import types
 from pydantic import BaseModel, Field
 
+from news_collector.models import Translation
 from news_collector.storage import Storage
+from news_collector.topics import load_config
 
 _T = TypeVar("_T")
 
@@ -140,6 +142,61 @@ def generate_tags_and_summary(
 
 
 # ──────────────────────────────────────────────
+# Translation
+# ──────────────────────────────────────────────
+
+_LANG_NAMES: dict[str, str] = {
+    "ja": "Japanese",
+    "ko": "Korean",
+    "zh": "Simplified Chinese",
+    "zh-tw": "Traditional Chinese",
+    "fr": "French",
+    "de": "German",
+    "es": "Spanish",
+    "pt": "Portuguese",
+}
+
+
+class _TranslationResult(BaseModel):
+    """Structured output from the translation step."""
+
+    title: str = Field(description="Translated article title")
+    summary: str = Field(description="Translated article summary")
+
+
+def translate_article(
+    client: genai.Client, title: str, summary: str, lang: str
+) -> tuple[str, str]:
+    """Translate title and summary into the target language using Gemini Flash."""
+    lang_name = _LANG_NAMES.get(lang, lang)
+
+    def _run() -> tuple[str, str]:
+        response = client.models.generate_content(
+            model=_FLASH_MODEL,
+            contents=(
+                f"Translate the following news article title and summary into {lang_name}.\n\n"
+                f"Title: {title}\n\n"
+                f"Summary:\n{summary}"
+            ),
+            config=types.GenerateContentConfig(
+                system_instruction=(
+                    f"You are a professional translator. Translate the given text into "
+                    f"{lang_name} accurately and naturally. Preserve technical terms "
+                    f"(CVE IDs, product names, organization names) as-is. "
+                    f"Do not add or omit information."
+                ),
+                response_mime_type="application/json",
+                response_schema=_TranslationResult,
+            ),
+        )
+        data = json.loads(response.text)
+        result = _TranslationResult(**data)
+        return result.title, result.summary
+
+    return _call_with_retry(_run, f"translate-{lang}")
+
+
+# ──────────────────────────────────────────────
 # Entry point
 # ──────────────────────────────────────────────
 
@@ -148,36 +205,75 @@ def run_process(args: argparse.Namespace) -> None:
     """Entry point for the process subcommand."""
     client = _make_client()
     storage = Storage(args.db)
+
+    # Resolve target languages from --topics file or --languages flag
+    languages: list[str] = []
+    if args.topics:
+        config = load_config(args.topics)
+        languages = config.languages
+    if args.languages:
+        languages = [l.strip() for l in args.languages.split(",")]
+
     try:
+        # Phase 1: Tag and summarize
         if args.force:
             articles = storage.get_all(args.from_date, args.to_date)
         else:
             articles = storage.get_unprocessed(args.from_date, args.to_date)
 
-        if not articles:
-            print("No articles to process.", file=sys.stderr)
+        if articles:
+            print(f"Tagging and summarizing {len(articles)} articles...", file=sys.stderr)
+            processed = 0
+            for article in articles:
+                tags, summary = generate_tags_and_summary(
+                    client, article.title, article.summary_raw
+                )
+                storage.update_processed(
+                    article.id,
+                    tags=tags,
+                    summary=summary,
+                    processed_at=datetime.now().isoformat(),
+                )
+                processed += 1
+                if args.verbose:
+                    print(f"  ✓ [{processed}/{len(articles)}] {article.title}", file=sys.stderr)
+                    print(f"    tags: {tags}", file=sys.stderr)
+                else:
+                    print(f"  ✓ {processed}/{len(articles)}", end="\r", file=sys.stderr)
+            print(f"\nDone: {processed} articles tagged.", file=sys.stderr)
+        else:
+            print("No articles to tag.", file=sys.stderr)
+
+        # Phase 2: Translate
+        if not languages:
             return
 
-        print(f"Processing {len(articles)} articles...", file=sys.stderr)
+        for lang in languages:
+            untranslated = storage.get_untranslated(lang, args.from_date, args.to_date)
+            if not untranslated:
+                print(f"No articles to translate to {lang}.", file=sys.stderr)
+                continue
 
-        processed = 0
-        for article in articles:
-            tags, summary = generate_tags_and_summary(
-                client, article.title, article.summary_raw
-            )
-            storage.update_processed(
-                article.id,
-                tags=tags,
-                summary=summary,
-                processed_at=datetime.now().isoformat(),
-            )
-            processed += 1
-            if args.verbose:
-                print(f"  ✓ [{processed}/{len(articles)}] {article.title}", file=sys.stderr)
-                print(f"    tags: {tags}", file=sys.stderr)
-            else:
-                print(f"  ✓ {processed}/{len(articles)}", end="\r", file=sys.stderr)
-
-        print(f"\nDone: {processed} articles processed.", file=sys.stderr)
+            print(f"\nTranslating {len(untranslated)} articles to {lang}...", file=sys.stderr)
+            translated = 0
+            for article in untranslated:
+                # Use processed summary if available, otherwise raw
+                source_summary = article.summary or article.summary_raw
+                t_title, t_summary = translate_article(
+                    client, article.title, source_summary, lang
+                )
+                storage.upsert_translation(Translation(
+                    article_id=article.id,
+                    lang=lang,
+                    title=t_title,
+                    summary=t_summary,
+                    translated_at=datetime.now(),
+                ))
+                translated += 1
+                if args.verbose:
+                    print(f"  ✓ [{translated}/{len(untranslated)}] {t_title}", file=sys.stderr)
+                else:
+                    print(f"  ✓ {translated}/{len(untranslated)}", end="\r", file=sys.stderr)
+            print(f"\nDone: {translated} articles translated to {lang}.", file=sys.stderr)
     finally:
         storage.close()
