@@ -1,22 +1,11 @@
 # Cloud Run Job definition for news-collector
 #
 # Deploy:
-#   # Build and push container image
-#   gcloud builds submit --tag gcr.io/${PROJECT_ID}/news-collector .
+#   gcloud builds submit --tag gcr.io/PROJECT_ID/news-collector .
+#   gcloud run jobs replace deploy/cloudrunjob.yaml --region us-central1 --project PROJECT_ID
 #
-#   # Create the job
-#   gcloud run jobs replace deploy/cloudrunjob.yaml --region us-central1
-#
-#   # Create daily schedule (07:00 JST = 22:00 UTC previous day)
-#   gcloud scheduler jobs create http news-collector-daily \
-#     --location us-central1 \
-#     --schedule "0 22 * * *" \
-#     --uri "https://us-central1-run.googleapis.com/apis/run.googleapis.com/v1/namespaces/${PROJECT_ID}/jobs/news-collector:run" \
-#     --http-method POST \
-#     --oauth-service-account-email ${SA_EMAIL}
-#
-#   # Manual test run
-#   gcloud run jobs execute news-collector --region us-central1
+# Manual test run:
+#   gcloud run jobs execute news-collector --region us-central1 --project PROJECT_ID
 
 apiVersion: run.googleapis.com/v1
 kind: Job
@@ -28,30 +17,30 @@ spec:
       template:
         spec:
           containers:
-            - image: gcr.io/PROJECT_ID/news-collector:latest  # Replace PROJECT_ID
+            - image: gcr.io/PROJECT_ID/news-collector:latest
               resources:
                 limits:
                   memory: "512Mi"
                   cpu: "1"
               env:
                 - name: GOOGLE_CLOUD_PROJECT
-                  value: "PROJECT_ID"           # Replace
+                  value: "PROJECT_ID"
                 - name: GOOGLE_CLOUD_LOCATION
                   value: "us-central1"
                 - name: GCS_BUCKET
-                  value: "BUCKET_NAME"          # Replace
+                  value: "BUCKET_NAME"
                 - name: SWRITE_MODE
                   value: "server"
                 - name: SWRITE_TOKEN
                   valueFrom:
                     secretKeyRef:
-                      name: slack-bot-token     # Create: gcloud secrets create slack-bot-token
+                      name: slack-bot-token
                       key: latest
                 - name: SWRITE_CHANNEL
-                  value: "#security-news"       # Replace
+                  value: "#news_collector"
                 - name: NEWS_LANG
                   value: "ja"
                 - name: POST_MODE
                   value: "curate"
-          timeoutSeconds: 1800                  # 30 minutes
-          serviceAccountName: SA_EMAIL          # Replace — needs roles/aiplatform.user + roles/storage.objectAdmin
+          timeoutSeconds: 1800
+          serviceAccountName: SA_EMAIL

@@ -5,7 +5,7 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
 # Install gsutil (via google-cloud-sdk)
 RUN apt-get update -qq && \
-    apt-get install -y -q --no-install-recommends curl gnupg && \
+    apt-get install -y -q --no-install-recommends curl gnupg unzip && \
     echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" \
       > /etc/apt/sources.list.d/google-cloud-sdk.list && \
     curl -fsSL https://packages.cloud.google.com/apt/doc/apt-key.gpg \

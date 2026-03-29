@@ -18,6 +18,9 @@
 
 set -euo pipefail
 
+# uv tool install puts binaries in ~/.local/bin
+export PATH="$HOME/.local/bin:$PATH"
+
 DB="/tmp/${DB_FILENAME:-news.db}"
 BUCKET="${GCS_BUCKET}"
 TOPICS="${TOPICS_FILE:-/app/topics.toml}"
