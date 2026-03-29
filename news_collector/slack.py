@@ -76,6 +76,32 @@ def build_digest_blocks(
     return blocks
 
 
+def build_single_article_blocks(
+    article: Article,
+    *,
+    lang: str = "",
+    commentary: str | None = None,
+) -> list[dict]:
+    """Build a standalone Block Kit message for a single article.
+
+    Each article becomes its own Slack message, avoiding clustered link previews.
+    """
+    blocks: list[dict] = []
+
+    _append_article_blocks(blocks, article, lang=lang, commentary=commentary)
+
+    # Footer
+    blocks.append({
+        "type": "context",
+        "elements": [{
+            "type": "mrkdwn",
+            "text": f"_news-collector_  ｜  {date.today().isoformat()}",
+        }],
+    })
+
+    return blocks
+
+
 def _append_article_blocks(
     blocks: list[dict],
     article: Article,
