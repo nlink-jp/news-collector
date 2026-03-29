@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=75.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "news-collector"
+version = "0.1.0"
+description = "News collection agent — collects, structures, tags, and summarizes news articles via Gemini"
+requires-python = ">=3.11"
+dependencies = [
+    "google-genai>=1.67.0",
+    "pydantic>=2.12.0",
+]
+
+[project.scripts]
+news-collector = "news_collector.cli:main"
+
+[project.urls]
+Repository = "https://github.com/nlink-jp/news-collector"
+
+[tool.setuptools.packages.find]
+include = ["news_collector*"]
+
+[dependency-groups]
+dev = [
+    "pyright>=1.1.408",
+    "pytest>=8.0.0",
+]
