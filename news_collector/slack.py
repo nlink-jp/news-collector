@@ -96,6 +96,32 @@ def build_digest_blocks(
     return blocks
 
 
+def build_single_article_blocks(
+    article: Article,
+    *,
+    lang: str = "",
+    commentary: str | None = None,
+) -> list[dict]:
+    """Build a Block Kit message for a single article (one post per article).
+
+    Starts with a divider to visually separate from the previous post
+    in Slack's collapsed consecutive-bot-message layout.
+    """
+    blocks: list[dict] = [{"type": "divider"}]
+
+    _append_article_blocks(blocks, article, lang=lang, commentary=commentary)
+
+    blocks.append({
+        "type": "context",
+        "elements": [{
+            "type": "mrkdwn",
+            "text": f"_news-collector_  ｜  {date.today().isoformat()}",
+        }],
+    })
+
+    return blocks
+
+
 def _append_article_blocks(
     blocks: list[dict],
     article: Article,

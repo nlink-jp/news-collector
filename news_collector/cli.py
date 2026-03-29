@@ -147,15 +147,16 @@ def _load_articles_for_output(args) -> list:
 
 def _run_notify(args) -> None:
     import json
-    from news_collector.slack import build_digest_blocks
+    from news_collector.slack import build_single_article_blocks
 
     articles = _load_articles_for_output(args)
     if not articles:
         print("No articles to notify.", file=sys.stderr)
         sys.exit(0)
 
-    blocks = build_digest_blocks(articles, title=args.title, lang=args.lang)
-    print(json.dumps(blocks, ensure_ascii=False))
+    for article in articles:
+        blocks = build_single_article_blocks(article, lang=args.lang)
+        print(json.dumps(blocks, ensure_ascii=False))
 
 
 def _run_curate(args) -> None:
@@ -163,7 +164,7 @@ def _run_curate(args) -> None:
     import os
     from google import genai
     from news_collector.processor import generate_commentary
-    from news_collector.slack import build_digest_blocks
+    from news_collector.slack import build_single_article_blocks
 
     articles = _load_articles_for_output(args)
     if not articles:
@@ -177,21 +178,20 @@ def _run_curate(args) -> None:
     )
 
     print(f"Generating commentary for {len(articles)} articles...", file=sys.stderr)
-    commentaries: dict[str, str] = {}
     for i, article in enumerate(articles):
         source_summary = article.summary or article.summary_raw
         commentary = generate_commentary(
             client, article.title, source_summary, article.tags, lang=args.lang,
         )
-        commentaries[article.id] = commentary
         if getattr(args, "verbose", False):
             print(f"  ✓ [{i + 1}/{len(articles)}] {article.title}", file=sys.stderr)
 
-    print("Done. Building Block Kit output...", file=sys.stderr)
-    blocks = build_digest_blocks(
-        articles, title=args.title, lang=args.lang, commentaries=commentaries,
-    )
-    print(json.dumps(blocks, ensure_ascii=False))
+        blocks = build_single_article_blocks(
+            article, lang=args.lang, commentary=commentary,
+        )
+        print(json.dumps(blocks, ensure_ascii=False))
+
+    print(f"Done: {len(articles)} articles.", file=sys.stderr)
 
 
 if __name__ == "__main__":
