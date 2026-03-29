@@ -9,6 +9,7 @@ import os
 import random
 import sys
 import time
+import urllib.request
 from collections.abc import Callable
 from datetime import date, datetime, timedelta
 from typing import TypeVar
@@ -177,21 +178,28 @@ def search_news(
 
     # Step 1: Search with Grounding
     print("  [Step 1] Searching with Google Search Grounding...", file=sys.stderr)
-    raw_text = _search_with_grounding(client, genre, from_date, to_date, verbose)
+    raw_text, ref_urls = _search_with_grounding(client, genre, from_date, to_date, verbose)
 
     if not raw_text.strip():
         print("  No results from search.", file=sys.stderr)
         return []
 
-    # Step 2: Extract structured articles
-    print("\n  [Step 2] Extracting structured article data...", file=sys.stderr)
-    items = _extract_articles(client, raw_text, genre)
+    # Step 2: Resolve redirect URLs to actual source URLs
+    print(f"\n  [Step 2] Resolving {len(ref_urls)} reference URLs...", file=sys.stderr)
+    url_mapping = _resolve_urls_batch(ref_urls, verbose=verbose)
+    resolved_urls = list(url_mapping.values())
+
+    # Step 3: Extract structured articles
+    print(f"  [Step 3] Extracting structured article data...", file=sys.stderr)
+    items = _extract_articles(client, raw_text, genre, resolved_urls)
 
     print(f"  Found {len(items)} articles.", file=sys.stderr)
 
-    # Convert to Article models
+    # Convert to Article models, resolving any remaining redirect URLs
     articles: list[Article] = []
     for item in items:
+        url = _resolve_redirect(item.url) if "vertexaisearch" in item.url else item.url
+
         pub_date: date | None = None
         if item.published_date:
             try:
@@ -201,9 +209,9 @@ def search_news(
 
         articles.append(
             Article(
-                id=_article_id(item.url),
+                id=_article_id(url),
                 title=item.title,
-                url=item.url,
+                url=url,
                 source=item.source,
                 published_date=pub_date,
                 genre=genre,
@@ -220,12 +228,17 @@ def _search_with_grounding(
     from_date: str,
     to_date: str,
     verbose: bool,
-) -> str:
-    """Use Gemini + Google Search Grounding to find news articles."""
+) -> tuple[str, list[str]]:
+    """Use Gemini + Google Search Grounding to find news articles.
+
+    Returns (raw_text, reference_urls) where reference_urls are the actual
+    source URLs discovered by Grounding.
+    """
     prompt = _build_search_prompt(genre, from_date, to_date)
 
-    def _run() -> str:
+    def _run() -> tuple[str, list[str]]:
         parts: list[str] = []
+        urls: list[str] = []
         for chunk in client.models.generate_content_stream(
             model=_SEARCH_MODEL,
             contents=prompt,
@@ -238,20 +251,32 @@ def _search_with_grounding(
                 parts.append(chunk.text)
                 print(chunk.text, end="", flush=True, file=sys.stderr)
 
-            if verbose and chunk.candidates:
+            if chunk.candidates:
                 for candidate in chunk.candidates:
                     meta = getattr(candidate, "grounding_metadata", None)
                     if meta:
                         for gc in getattr(meta, "grounding_chunks", []) or []:
                             web = getattr(gc, "web", None)
                             if web:
-                                print(
-                                    f"\n    [ref] {getattr(web, 'uri', '')}",
-                                    file=sys.stderr,
-                                )
+                                uri = getattr(web, "uri", "")
+                                title = getattr(web, "title", "")
+                                if uri:
+                                    urls.append(uri)
+                                    if verbose:
+                                        print(
+                                            f"\n    [ref] {uri}",
+                                            file=sys.stderr,
+                                        )
 
         print(file=sys.stderr)
-        return "".join(parts)
+        # Deduplicate while preserving order
+        seen: set[str] = set()
+        unique_urls: list[str] = []
+        for u in urls:
+            if u not in seen:
+                seen.add(u)
+                unique_urls.append(u)
+        return "".join(parts), unique_urls
 
     return _call_with_retry(_run, "search")
 
@@ -260,8 +285,11 @@ def _extract_articles(
     client: genai.Client,
     raw_text: str,
     genre: str,
+    ref_urls: list[str],
 ) -> list[_NewsItem]:
     """Extract structured article records from raw search text."""
+
+    url_list = "\n".join(f"- {u}" for u in ref_urls) if ref_urls else "(none available)"
 
     def _run() -> list[_NewsItem]:
         response = client.models.generate_content(
@@ -270,6 +298,10 @@ def _extract_articles(
                 f"Extract all distinct news articles from the following research text "
                 f"about {genre}. Return each article with its title, URL, source, "
                 f"publication date, and summary.\n\n"
+                f"IMPORTANT: Use the actual source URLs from the reference list below. "
+                f"Do NOT fabricate or guess URLs. If no matching URL is found for an "
+                f"article, use the most relevant URL from the reference list.\n\n"
+                f"Reference URLs (from Google Search):\n{url_list}\n\n"
                 f"Research text:\n{raw_text}"
             ),
             config=types.GenerateContentConfig(
@@ -282,6 +314,45 @@ def _extract_articles(
         return result.articles
 
     return _call_with_retry(_run, "extract")
+
+
+def _resolve_redirect(url: str, timeout: float = 5.0) -> str:
+    """Resolve a Vertex AI grounding redirect URL to the actual source URL.
+
+    Returns the original URL unchanged if it is not a redirect or if
+    resolution fails.
+    """
+    if "vertexaisearch.cloud.google.com/grounding-api-redirect" not in url:
+        return url
+    try:
+        req = urllib.request.Request(url, method="HEAD")
+        # Use a non-redirecting opener to read the Location header
+        class _NoRedirect(urllib.request.HTTPRedirectHandler):
+            def redirect_request(self, req, fp, code, msg, headers, newurl):  # type: ignore[override]
+                return None
+
+        opener = urllib.request.build_opener(_NoRedirect)
+        try:
+            opener.open(req, timeout=timeout)
+        except urllib.error.HTTPError as e:
+            if e.status in (301, 302, 303, 307, 308):
+                location = e.headers.get("Location", "")
+                if location:
+                    return location
+        return url
+    except Exception:
+        return url
+
+
+def _resolve_urls_batch(urls: list[str], verbose: bool = False) -> dict[str, str]:
+    """Resolve a list of redirect URLs. Returns a mapping old → resolved."""
+    mapping: dict[str, str] = {}
+    for url in urls:
+        resolved = _resolve_redirect(url)
+        mapping[url] = resolved
+        if verbose and resolved != url:
+            print(f"    [resolved] {resolved}", file=sys.stderr)
+    return mapping
 
 
 def _article_id(url: str) -> str:
