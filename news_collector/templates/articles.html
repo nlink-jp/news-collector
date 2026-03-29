@@ -141,19 +141,19 @@
 {% if total_pages > 1 %}
 <div class="pagination">
   {% if page > 1 %}
-  <a href="/articles?page={{ page - 1 }}&genre={{ genre }}&tag={{ tag }}&q={{ q }}&lang={{ lang }}&from={{ from_date }}&to={{ to_date }}&sort={{ sort }}&sort={{ sort }}">&laquo; Prev</a>
+  <a href="/articles?page={{ page - 1 }}&genre={{ genre }}&tag={{ tag }}&q={{ q }}&lang={{ lang }}&from={{ from_date }}&to={{ to_date }}&sort={{ sort }}">&laquo; Prev</a>
   {% endif %}
   {% for p in range(1, total_pages + 1) %}
     {% if p == page %}
     <span class="current">{{ p }}</span>
     {% elif p <= 3 or p > total_pages - 2 or (p >= page - 1 and p <= page + 1) %}
-    <a href="/articles?page={{ p }}&genre={{ genre }}&tag={{ tag }}&q={{ q }}&lang={{ lang }}&from={{ from_date }}&to={{ to_date }}&sort={{ sort }}&sort={{ sort }}">{{ p }}</a>
+    <a href="/articles?page={{ p }}&genre={{ genre }}&tag={{ tag }}&q={{ q }}&lang={{ lang }}&from={{ from_date }}&to={{ to_date }}&sort={{ sort }}">{{ p }}</a>
     {% elif p == 4 or p == total_pages - 2 %}
     <span style="color: var(--text-secondary);">...</span>
     {% endif %}
   {% endfor %}
   {% if page < total_pages %}
-  <a href="/articles?page={{ page + 1 }}&genre={{ genre }}&tag={{ tag }}&q={{ q }}&lang={{ lang }}&from={{ from_date }}&to={{ to_date }}&sort={{ sort }}&sort={{ sort }}">Next &raquo;</a>
+  <a href="/articles?page={{ page + 1 }}&genre={{ genre }}&tag={{ tag }}&q={{ q }}&lang={{ lang }}&from={{ from_date }}&to={{ to_date }}&sort={{ sort }}">Next &raquo;</a>
   {% endif %}
 </div>
 {% endif %}
@@ -164,7 +164,6 @@
   var _tag = {{ tag | tojson }};
   var _lang = {{ lang | tojson }};
   var _sort = {{ sort | tojson }};
-  var _sort = {{ sort | tojson }};
 
   function buildUrl(overrides) {
     var p = {
@@ -172,7 +171,6 @@
       tag: overrides.tag !== undefined ? overrides.tag : _tag,
       q: overrides.q !== undefined ? overrides.q : document.getElementById('f-q').value,
       lang: overrides.lang !== undefined ? overrides.lang : _lang,
-      sort: overrides.sort !== undefined ? overrides.sort : _sort,
       sort: overrides.sort !== undefined ? overrides.sort : _sort,
       from: overrides.from !== undefined ? overrides.from : (document.getElementById('f-from').value || ''),
       to: overrides.to !== undefined ? overrides.to : (document.getElementById('f-to').value || ''),
@@ -191,7 +189,6 @@
     o[which] = '';
     window.location = buildUrl(o);
   }
-  function toggleSort() { window.location = buildUrl({sort: _sort === "asc" ? "desc" : "asc"}); }
   function toggleSort() { window.location = buildUrl({sort: _sort === "asc" ? "desc" : "asc"}); }
   function applyFilters() { window.location = buildUrl({}); }
 
