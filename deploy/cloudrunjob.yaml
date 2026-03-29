@@ -1,11 +1,16 @@
 # Cloud Run Job definition for news-collector
 #
+# Before deploying, replace all placeholders:
+#   PROJECT_ID  — your GCP project ID
+#   BUCKET_NAME — your GCS bucket name (e.g. ${PROJECT_ID}-data)
+#   SA_EMAIL    — your service account email
+#
 # Deploy:
-#   gcloud builds submit --tag gcr.io/PROJECT_ID/news-collector .
-#   gcloud run jobs replace deploy/cloudrunjob.yaml --region us-central1 --project PROJECT_ID
+#   gcloud builds submit --tag gcr.io/${PROJECT_ID}/news-collector:latest --project ${PROJECT_ID}
+#   gcloud run jobs replace deploy/cloudrunjob.yaml --region us-central1 --project ${PROJECT_ID}
 #
 # Manual test run:
-#   gcloud run jobs execute news-collector --region us-central1 --project PROJECT_ID
+#   gcloud run jobs execute news-collector --region us-central1 --project ${PROJECT_ID} --wait
 
 apiVersion: run.googleapis.com/v1
 kind: Job

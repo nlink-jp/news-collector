@@ -28,3 +28,4 @@ data/
 .vscode/
 *.swp
 *.swo
+deploy/*.local.yaml
