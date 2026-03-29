@@ -173,14 +173,41 @@ gcloud scheduler jobs create http news-collector-daily \
 
 ## Cost Estimate
 
-| Resource | Usage | Estimated Cost |
+Based on actual execution data (single run, 1 topic, cybersecurity genre):
+
+### Per-execution breakdown
+
+| Resource | Quantity | Estimated Cost |
 |---|---|---|
-| Cloud Run Job | ~7 min/day | ~$0 (free tier: 240k vCPU-seconds/month) |
-| Vertex AI (Gemini Pro) | ~10k tokens/day | ~$0.01/day |
-| Vertex AI (Gemini Flash) | ~50k tokens/day | ~$0.005/day |
-| Cloud Storage | < 1 MB | ~$0 |
-| Cloud Scheduler | 1 job/day | ~$0 (free tier: 3 jobs) |
-| **Total** | | **~$0.50/month** |
+| Gemini 2.5 Pro (collect) | 5 API calls, ~40K tokens | ~$0.18 |
+| Gemini 2.5 Flash (process + curate) | 57 API calls, ~142K tokens | ~$0.03 |
+| Cloud Run Job | 7 min (0.5 vCPU, 512 MB) | ~$0.00 (free tier) |
+| Cloud Storage | 56 KB (news.db) | ~$0.00 |
+| Cloud Build | 2 min (per rebuild) | ~$0.00 (free tier) |
+| **Per-run total** | | **~$0.22** |
+
+### Monthly estimate (daily execution)
+
+| Scenario | Cost |
+|---|---|
+| 1 topic, 1 run/day | ~$6.50/month |
+| 2 topics, 1 run/day | ~$13/month |
+| 1 topic, weekdays only | ~$4.80/month |
+
+### Cost drivers
+
+- **Gemini Pro is the dominant cost** (~82% of total). It is used for the
+  `collect` step (Google Search Grounding requires Pro, not Flash).
+- **Gemini Flash is very cheap** — 57 calls for tagging, summarization,
+  translation, and curation cost only ~$0.03.
+- **Cloud Run, Storage, and Scheduler** are within GCP free tier for
+  this workload.
+
+### Optimization opportunities
+
+- Collect more articles per Pro call (reduce call count)
+- Skip `curate` and use `notify` instead (fewer Flash calls, no commentary)
+- Use `SKIP_POST=true` to collect/process without Slack posting
 
 ## Updating
 
