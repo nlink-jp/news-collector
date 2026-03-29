@@ -1,0 +1,12 @@
+## news-collector production topic configuration
+## Customize for your deployment.
+
+languages = ["ja"]
+
+[[topics]]
+name = "cybersecurity"
+keywords = ["data breach", "ransomware", "vulnerability", "zero-day", "APT", "malware", "phishing"]
+
+# [[topics]]
+# name = "ai-security"
+# keywords = ["AI security", "LLM vulnerability", "prompt injection", "AI regulation"]
