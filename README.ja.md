@@ -1,6 +1,6 @@
 # news-collector
 
-Gemini + Google Search Grounding でニュース記事を自動収集し、構造化データとして蓄積。タグ付け・要約・多言語翻訳まで自動化する CLI ツール。
+Gemini + Google Search Grounding でニュース記事を自動収集し、構造化データとして蓄積。タグ付け・要約・多言語翻訳を自動化し、Slack 配信やローカル Web ダッシュボードで閲覧できる CLI ツール。
 
 デイリーバッチで実行し、再利用可能な多言語ニュースアーカイブを構築する。
 
@@ -14,7 +14,12 @@ Gemini + Google Search Grounding でニュース記事を自動収集し、構�
 - **自動タグ付け** — Gemini 2.5 Flash が記事ごとに 3-8 個のトピックタグを生成
 - **自動要約** — Gemini 2.5 Flash が 2-4 文の簡潔な要約を生成
 - **多言語翻訳** — タイトルと要約を設定した対象言語（日本語・韓国語・中国語等）に自動翻訳
+- **Slack 通知** — 記事を Slack Block Kit JSON（JSONL）で出力。[swrite](https://github.com/nlink-jp/swrite) にパイプして投稿。タグベースの絵文字バッジ付き
+- **AI キュレーション** — Gemini Flash がフレンドリーなアナリストコメントを記事ごとに生成して Slack 配信
+- **Web ダッシュボード** — FastAPI + Jinja2 のローカル UI。記事一覧（フィルタ/ソート/検索/日付範囲/タグ/言語切替）、記事詳細、ダーク/ライトモード対応
 - **冪等処理** — タグ付け・要約・翻訳の各ステップは処理済みをスキップ。再実行しても安全
+- **堅牢なリトライ** — 共通の指数バックオフ（6回、最大120秒）で Gemini 429/RESOURCE_EXHAUSTED エラーに対応
+- **セキュリティ対策** — SQLi 防止（パラメータバインド）、XSS 防止（tojson フィルタ、safe_url）
 - **バッチ実行対応** — cron / launchd でのデイリー実行を想定
 
 ## インストール
@@ -101,6 +106,34 @@ news-collector process --topics topics.toml --from 2026-03-01 --to 2026-03-31
 news-collector process --force --topics topics.toml
 ```
 
+### 通知（Slack 出力 — コメントなし）
+
+```bash
+# 各記事を Slack Block Kit JSON で出力（1行1記事）
+news-collector notify --db news.db --lang ja | while IFS= read -r line; do
+  printf '%s' "$line" | swrite post --format blocks --no-unfurl -c "#news"
+done
+
+# ジャンル・日付範囲でフィルタ
+news-collector notify --db news.db --lang ja --genre cybersecurity --from 2026-03-28
+```
+
+### キュレーション（Slack 出力 — AI コメント付き）
+
+```bash
+# Gemini Flash がフレンドリーなアナリストコメントを記事ごとに生成
+news-collector curate --db news.db --lang ja | while IFS= read -r line; do
+  printf '%s' "$line" | swrite post --format blocks --no-unfurl -c "#news"
+done
+```
+
+### Web UI
+
+```bash
+news-collector serve --db news.db --port 8080
+# http://127.0.0.1:8080 を開く — ダッシュボード、記事一覧、記事詳細
+```
+
 ### デイリーバッチの例
 
 ```bash
@@ -128,6 +161,20 @@ news-collector process --force --topics topics.toml
 | `process` | `--to` | — | 終了日フィルタ |
 | `process` | `--db` | `news.db` | SQLite データベースパス |
 | `process` | `--force` | off | 処理済み記事も再処理 |
+| `notify` | `--db` | `news.db` | SQLite データベースパス |
+| `notify` | `--lang, -l` | — | この言語の翻訳を使用 |
+| `notify` | `--genre, -g` | — | ジャンルでフィルタ |
+| `notify` | `--from` / `--to` | — | 日付範囲フィルタ |
+| `notify` | `--limit` | `0`（全件） | 最大出力記事数 |
+| `curate` | `--db` | `news.db` | SQLite データベースパス |
+| `curate` | `--lang, -l` | — | 翻訳・コメントの言語 |
+| `curate` | `--genre, -g` | — | ジャンルでフィルタ |
+| `curate` | `--from` / `--to` | — | 日付範囲フィルタ |
+| `curate` | `--limit` | `0`（全件） | 最大出力記事数 |
+| `curate` | `--verbose, -v` | off | stderr に進捗表示 |
+| `serve` | `--db` | `news.db` | SQLite データベースパス |
+| `serve` | `--host` | `127.0.0.1` | バインドアドレス |
+| `serve` | `--port, -p` | `8080` | ポート番号 |
 | 共通 | `--verbose, -v` | off | 詳細表示 |
 
 ## データスキーマ
@@ -171,17 +218,30 @@ news-collector process --force --topics topics.toml
 | `es` | スペイン語 |
 | `pt` | ポルトガル語 |
 
+## Block Kit デザイン
+
+Slack に投稿される各記事には以下が含まれる:
+
+- タグベースの絵文字バッジ（例: `🚨 [BREACH]`, `⚠️ [CVE]`, `📜 [POLICY]`, `🤖 [AI]`）
+- タイトル（リンク付き）＋翻訳タイトル（`--lang` 指定時）
+- 要約（翻訳版または原文）
+- アナリストコメント（curate のみ、引用ブロック）
+- ソースメタデータ、タグ、直リンク URL
+- 記事間の divider 区切り
+
 ## 開発
 
 ```bash
 uv sync           # 依存関係のインストール
-uv run pytest     # テスト実行（9テスト）
+uv run pytest     # テスト実行
 uv run pyright    # 型チェック
 ```
 
 ## 注意事項
 
 - 収集には Gemini 2.5 Pro + Google Search Grounding を使用（Vertex AI 課金あり）
-- 処理・翻訳には Gemini 2.5 Flash を使用（低コスト）
+- 処理・翻訳・キュレーションには Gemini 2.5 Flash を使用（低コスト）
 - 同じ日付範囲を再収集しても URL ハッシュで重複排除される
 - 全処理ステップは冪等: タグ付け・要約・翻訳それぞれ処理済みをスキップ
+- リトライ: 共通の指数バックオフ（6回、ベース5秒、最大120秒）＋ジッターで Gemini 429/RESOURCE_EXHAUSTED に対応
+- Web UI はパラメータバインド（SQLi 防止）、safe_url/tojson フィルタ（XSS 防止）を使用

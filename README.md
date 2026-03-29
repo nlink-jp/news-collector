@@ -1,6 +1,6 @@
 # news-collector
 
-A CLI agent that collects news articles via Gemini + Google Search Grounding, structures them into a dataset, and automatically tags, summarizes, and translates them.
+A CLI agent that collects news articles via Gemini + Google Search Grounding, structures them into a dataset, automatically tags, summarizes, and translates them, then delivers curated digests to Slack or a local web dashboard.
 
 Designed for daily batch execution to build a reusable, structured, multilingual news archive.
 
@@ -14,7 +14,12 @@ Designed for daily batch execution to build a reusable, structured, multilingual
 - **Auto-tagging** — Gemini 2.5 Flash generates 3-8 topic tags per article
 - **Auto-summarization** — Gemini 2.5 Flash produces concise 2-4 sentence summaries
 - **Multi-language translation** — Translates titles and summaries into configurable target languages (Japanese, Korean, Chinese, etc.) via Gemini Flash
+- **Slack notification** — Output articles as Slack Block Kit JSON (JSONL); pipe to [swrite](https://github.com/nlink-jp/swrite) for posting. Tag-based emoji badges per article
+- **AI-curated commentary** — Gemini Flash generates friendly analyst comments for each article before Slack delivery
+- **Web dashboard** — FastAPI + Jinja2 local UI with article listing (filter/sort/search/date range/tag/language), detail view, and dark/light mode
 - **Idempotent processing** — All steps (tagging, summarization, translation) skip already-completed work; safe to re-run
+- **Robust retry** — Shared exponential backoff (6 retries, max 120s) for Gemini 429/RESOURCE_EXHAUSTED errors
+- **Security hardened** — SQLi prevention (parameter binding), XSS prevention (tojson filter, safe_url)
 - **Batch-friendly** — Designed for cron/launchd daily execution
 
 ## Installation
@@ -101,6 +106,34 @@ news-collector process --topics topics.toml --from 2026-03-01 --to 2026-03-31
 news-collector process --force --topics topics.toml
 ```
 
+### Notify (Slack output — no commentary)
+
+```bash
+# Output each article as Slack Block Kit JSON (one JSON line per article)
+news-collector notify --db news.db --lang ja | while IFS= read -r line; do
+  printf '%s' "$line" | swrite post --format blocks --no-unfurl -c "#news"
+done
+
+# Filter by genre and date range
+news-collector notify --db news.db --lang ja --genre cybersecurity --from 2026-03-28
+```
+
+### Curate (Slack output — with AI commentary)
+
+```bash
+# Gemini Flash generates a friendly analyst comment per article
+news-collector curate --db news.db --lang ja | while IFS= read -r line; do
+  printf '%s' "$line" | swrite post --format blocks --no-unfurl -c "#news"
+done
+```
+
+### Serve (Web UI)
+
+```bash
+news-collector serve --db news.db --port 8080
+# Open http://127.0.0.1:8080 — dashboard, article list, detail view
+```
+
 ### Daily batch example
 
 ```bash
@@ -128,7 +161,21 @@ news-collector process --force --topics topics.toml
 | `process` | `--to` | — | End date filter |
 | `process` | `--db` | `news.db` | SQLite database path |
 | `process` | `--force` | off | Re-process already processed articles |
-| both | `--verbose, -v` | off | Show detailed progress |
+| `notify` | `--db` | `news.db` | SQLite database path |
+| `notify` | `--lang, -l` | — | Use translations for this language |
+| `notify` | `--genre, -g` | — | Filter by genre |
+| `notify` | `--from` / `--to` | — | Date range filter |
+| `notify` | `--limit` | `0` (all) | Max articles to output |
+| `curate` | `--db` | `news.db` | SQLite database path |
+| `curate` | `--lang, -l` | — | Language for translations and commentary |
+| `curate` | `--genre, -g` | — | Filter by genre |
+| `curate` | `--from` / `--to` | — | Date range filter |
+| `curate` | `--limit` | `0` (all) | Max articles to output |
+| `curate` | `--verbose, -v` | off | Show progress on stderr |
+| `serve` | `--db` | `news.db` | SQLite database path |
+| `serve` | `--host` | `127.0.0.1` | Bind address |
+| `serve` | `--port, -p` | `8080` | Port number |
+| common | `--verbose, -v` | off | Show detailed progress |
 
 ## Data Schema
 
@@ -175,17 +222,30 @@ news-collector process --force --topics topics.toml
 
 Each line is a JSON object matching the `Article` Pydantic model.
 
+## Block Kit Design
+
+Each article posted to Slack includes:
+
+- Tag-based emoji badge in the header (e.g. `🚨 [BREACH]`, `⚠️ [CVE]`, `📜 [POLICY]`, `🤖 [AI]`)
+- Article title with link + translated title (if `--lang` specified)
+- Summary (translated or original)
+- Analyst commentary (curate only, quoted block)
+- Source metadata, tags, and direct URL
+- Divider separators between articles
+
 ## Building
 
 ```bash
 uv sync           # install dependencies
-uv run pytest     # run tests (9 tests)
+uv run pytest     # run tests
 uv run pyright    # type checking
 ```
 
 ## Notes
 
 - Collection uses Gemini 2.5 Pro with Google Search Grounding (Vertex AI costs apply)
-- Processing and translation use Gemini 2.5 Flash (low cost)
+- Processing, translation, and curation use Gemini 2.5 Flash (low cost)
 - Articles are deduplicated by URL hash; re-collecting the same date range is safe
 - All processing steps are idempotent: tagging, summarization, and translation each skip already-completed work
+- Retry logic: shared exponential backoff (6 retries, base 5s, max 120s) with jitter for Gemini 429/RESOURCE_EXHAUSTED errors
+- Web UI uses parameterized SQL queries (SQLi prevention) and safe_url/tojson filters (XSS prevention)

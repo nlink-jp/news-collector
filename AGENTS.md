@@ -1,8 +1,9 @@
 # AGENTS.md — news-collector
 
-News collection, structuring, tagging, summarization, and translation agent.
+News collection, structuring, tagging, summarization, translation, and delivery agent.
 Collects articles via Gemini + Google Search Grounding, stores in SQLite + JSONL,
-tags and summarizes via Gemini Flash, and translates into configurable languages.
+tags and summarizes via Gemini Flash, translates into configurable languages,
+and delivers curated digests to Slack (via swrite) or a local web dashboard.
 Part of [cybersecurity-series](https://github.com/nlink-jp/cybersecurity-series).
 
 ## Rules
@@ -23,12 +24,17 @@ uv tool install . # install as CLI tool
 
 ```
 news_collector/
-  cli.py           ← argparse entry point (collect / process subcommands)
+  cli.py           ← argparse entry point (collect / process / notify / curate / serve)
   models.py        ← Pydantic Article + Translation models
   storage.py       ← SQLite + JSONL dual storage (articles + translations tables)
   collector.py     ← Gemini 2.5 Pro + Grounding → article discovery + URL resolution
-  processor.py     ← Gemini 2.5 Flash → tagging + summarization + translation
+  processor.py     ← Gemini 2.5 Flash → tagging + summarization + translation + commentary
   topics.py        ← TOML config loader (topics + keywords + languages)
+  retry.py         ← Shared retry logic (6 retries, exponential backoff, max 120s)
+  slack.py         ← Slack Block Kit builder (tag→emoji badges, single/digest formats)
+  web.py           ← FastAPI + Jinja2 web UI (dashboard, article list, detail, API)
+  templates/       ← Jinja2 HTML templates (dashboard, articles, detail)
+  static/          ← CSS/JS assets for web UI (dark/light mode)
 tests/
   test_storage.py  ← storage unit tests
   test_topics.py   ← topic config loading tests
@@ -43,3 +49,9 @@ tests/
 - **Date handling**: `--from` / `--to` are inclusive. Default is yesterday for `collect`, no default for `process` (processes all unprocessed).
 - **Module path**: `github.com/nlink-jp/news-collector` (Python package: `news_collector`).
 - **Env vars**: `GOOGLE_CLOUD_PROJECT` (required), `GOOGLE_CLOUD_LOCATION` (optional, default `us-central1`).
+- **notify/curate output**: JSONL format (one JSON line per article). Designed to pipe each line individually to `swrite post --format blocks --no-unfurl`.
+- **curate vs notify**: curate calls `generate_commentary()` in processor.py which requires a Gemini client; notify is offline (no API calls).
+- **retry.py**: All Gemini API calls should use `call_with_retry()`. 6 retries, exponential backoff (5s base), capped at 120s, with ±1s jitter.
+- **slack.py tag badges**: `_TAG_BADGE` dict maps tag names to emoji+label pairs. Unrecognized tags fall back to the default NEWS badge.
+- **Web UI security**: storage.py uses parameterized queries (never string interpolation). Templates use `tojson` for JSON embedding and `safe_url` filter to prevent javascript: URLs.
+- **serve command**: Runs uvicorn directly; no ASGI middleware. For production, use a reverse proxy.
