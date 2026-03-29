@@ -76,21 +76,48 @@ def build_digest_blocks(
     return blocks
 
 
-def build_single_article_blocks(
+# Tag-based color mapping for the attachment sidebar
+_TAG_COLORS: dict[str, str] = {
+    "data-breach": "#e01e5a",
+    "ransomware": "#e01e5a",
+    "vulnerability": "#ff9800",
+    "cve": "#ff9800",
+    "zero-day": "#e01e5a",
+    "phishing": "#e01e5a",
+    "malware": "#e01e5a",
+    "policy": "#2eb67d",
+    "regulation": "#2eb67d",
+    "government": "#36c5f0",
+    "ai-security": "#4a154b",
+    "cloud-security": "#36c5f0",
+    "education": "#2eb67d",
+}
+_DEFAULT_COLOR = "#4a9eff"
+
+
+def _pick_color(tags: list[str]) -> str:
+    """Pick an attachment sidebar color based on article tags."""
+    for tag in tags:
+        if tag in _TAG_COLORS:
+            return _TAG_COLORS[tag]
+    return _DEFAULT_COLOR
+
+
+def build_single_article_payload(
     article: Article,
     *,
     lang: str = "",
     commentary: str | None = None,
-) -> list[dict]:
-    """Build a standalone Block Kit message for a single article.
+) -> dict:
+    """Build a Slack payload with colored attachment panel for a single article.
 
-    Each article becomes its own Slack message, avoiding clustered link previews.
+    Returns a dict with "attachments" key (use with swrite --format payload).
     """
     blocks: list[dict] = []
 
     _append_article_blocks(blocks, article, lang=lang, commentary=commentary)
 
-    # Footer
+    # Footer inside the panel
     blocks.append({
         "type": "context",
         "elements": [{
@@ -99,7 +126,14 @@ def build_single_article_blocks(
         }],
     })
 
-    return blocks
+    color = _pick_color(article.tags)
+
+    return {
+        "attachments": [{
+            "color": color,
+            "blocks": blocks,
+        }],
+    }
 
 
 def _append_article_blocks(
