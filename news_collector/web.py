@@ -76,10 +76,16 @@ def create_app(db_path: str) -> FastAPI:
         page: int = Query(1, ge=1),
         from_date: str = Query("", alias="from"),
         to_date: str = Query("", alias="to"),
+        sort: str = Query("desc"),
     ):
         storage = _storage()
         try:
             articles = storage.get_all(from_date=from_date or None, to_date=to_date or None)
+            # Sort by collected_at
+            if sort == "asc":
+                articles.sort(key=lambda a: a.collected_at)
+            else:
+                articles.sort(key=lambda a: a.collected_at, reverse=True)
 
             if genre:
                 articles = [a for a in articles if a.genre == genre]
@@ -124,6 +130,7 @@ def create_app(db_path: str) -> FastAPI:
                 "tag": tag,
                 "q": q,
                 "lang": lang,
+                "sort": sort,
                 "from_date": from_date,
                 "to_date": to_date,
                 "all_genres": all_genres,

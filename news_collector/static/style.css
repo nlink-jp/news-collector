@@ -265,3 +265,12 @@ th { color: var(--text-secondary); font-weight: 600; }
 .article-url { font-size: 12px; margin-bottom: 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .article-url a { color: var(--text-secondary); }
 .article-url a:hover { color: var(--accent); }
+
+/* Sort toggle */
+.sort-toggle {
+  font-size: 13px; color: var(--text-secondary);
+  cursor: pointer; padding: 4px 12px;
+  border: 1px solid var(--border); border-radius: 6px;
+  background: var(--surface); white-space: nowrap;
+}
+.sort-toggle:hover { border-color: var(--accent); color: var(--text); }
