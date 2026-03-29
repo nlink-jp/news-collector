@@ -233,7 +233,7 @@ th { color: var(--text-secondary); font-weight: 600; }
 .lang-pill.active { background: var(--accent); color: white; border-color: var(--accent); }
 
 /* Tag cloud in filter */
-.tag-cloud-filter { display: flex; flex-wrap: wrap; gap: 6px; max-height: 120px; overflow-y: auto; }
+.tag-cloud-filter { display: flex; flex-wrap: wrap; gap: 6px; max-height: 200px; overflow-y: auto; }
 .tag-active { background: var(--accent) !important; color: white !important; }
 
 /* Active filters bar */
@@ -260,3 +260,8 @@ th { color: var(--text-secondary); font-weight: 600; }
   .filter-row { flex-direction: column; }
   .filter-grow { min-width: unset; }
 }
+
+/* Article source URL */
+.article-url { font-size: 12px; margin-bottom: 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.article-url a { color: var(--text-secondary); }
+.article-url a:hover { color: var(--accent); }

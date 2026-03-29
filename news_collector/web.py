@@ -14,6 +14,15 @@ from news_collector.storage import Storage
 
 _HERE = Path(__file__).parent
 _TEMPLATES = Jinja2Templates(directory=str(_HERE / "templates"))
+_TEMPLATES.env.filters["safe_url"] = lambda u: u if u and u.lower().startswith(("http://", "https://")) else ""
+_SAFE_SCHEMES = ("http://", "https://")
+
+
+def _safe_url(url: str) -> str:
+    """Sanitize a URL: only allow http/https schemes to prevent javascript: XSS."""
+    if url and url.lower().startswith(_SAFE_SCHEMES):
+        return url
+    return ""
 
 
 def create_app(db_path: str) -> FastAPI:

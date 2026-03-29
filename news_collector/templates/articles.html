@@ -65,7 +65,7 @@
       <label class="filter-label">Tags {% if tag %}<span class="filter-clear" onclick="setTag('')">clear</span>{% endif %}</label>
       <div class="tag-cloud-filter">
         {% for t, count in all_tags %}
-        <span class="tag {{ 'tag-active' if t == tag }}" onclick="setTag('{{ t }}')">{{ t }}<span class="count">({{ count }})</span></span>
+        <span class="tag {{ 'tag-active' if t == tag }}" onclick="setTag('{{ '' if t == tag else t }}')">{{ t }}<span class="count">({{ count }})</span></span>
         {% endfor %}
       </div>
     </div>
@@ -104,6 +104,9 @@
     {% if article.published_date %}<span>{{ article.published_date }}</span>{% endif %}
     <span class="tag" style="font-size: 11px;">{{ article.genre }}</span>
   </div>
+  {% if article.url %}
+  <div class="article-url"><a href="{{ article.url | safe_url }}" target="_blank" rel="noopener">{{ article.url | truncate(80, True) }}</a></div>
+  {% endif %}
   <div class="article-summary">
     {% if lang and lang in article.translations %}
       {{ article.translations[lang].summary }}
@@ -116,7 +119,7 @@
   {% if article.tags %}
   <div class="article-tags">
     {% for t in article.tags %}
-    <span class="tag {{ 'tag-active' if t == tag }}" onclick="setTag('{{ t }}')">{{ t }}</span>
+    <span class="tag {{ 'tag-active' if t == tag }}" onclick="setTag('{{ '' if t == tag else t }}')">{{ t }}</span>
     {% endfor %}
   </div>
   {% endif %}
@@ -152,9 +155,9 @@
 
 <script>
   // Current filter state
-  var _genre = "{{ genre }}";
-  var _tag = "{{ tag }}";
-  var _lang = "{{ lang }}";
+  var _genre = {{ genre | tojson }};
+  var _tag = {{ tag | tojson }};
+  var _lang = {{ lang | tojson }};
 
   function buildUrl(overrides) {
     var p = {
