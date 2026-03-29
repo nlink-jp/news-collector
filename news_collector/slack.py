@@ -7,31 +7,40 @@ from urllib.parse import urlparse
 
 from news_collector.models import Article, Translation
 
-# Tag-based severity emoji
-_TAG_EMOJI: dict[str, str] = {
-    "data-breach": "🔴",
-    "ransomware": "🔴",
-    "zero-day": "🔴",
-    "phishing": "🔴",
-    "malware": "🔴",
-    "vulnerability": "🟠",
-    "cve": "🟠",
-    "policy": "🟢",
-    "regulation": "🟢",
-    "education": "🟢",
-    "government": "🔵",
-    "cloud-security": "🔵",
-    "ai-security": "🟣",
+# Tag → (emoji, label) mapping for article header badges
+_TAG_BADGE: dict[str, tuple[str, str]] = {
+    "data-breach": ("🚨", "BREACH"),
+    "ransomware": ("🚨", "RANSOMWARE"),
+    "zero-day": ("💥", "ZERO-DAY"),
+    "phishing": ("🎣", "PHISHING"),
+    "malware": ("🚨", "MALWARE"),
+    "vulnerability": ("⚠️", "VULN"),
+    "cve": ("⚠️", "CVE"),
+    "supply-chain": ("🚨", "SUPPLY-CHAIN"),
+    "ddos": ("🚨", "DDoS"),
+    "nation-state": ("🎯", "APT"),
+    "apt": ("🎯", "APT"),
+    "insider-threat": ("🎯", "INSIDER"),
+    "policy": ("📜", "POLICY"),
+    "regulation": ("📜", "REGULATION"),
+    "education": ("🎓", "EDUCATION"),
+    "government": ("🏛️", "GOV"),
+    "cloud-security": ("☁️", "CLOUD"),
+    "ai-security": ("🤖", "AI"),
+    "critical-infrastructure": ("🏗️", "INFRA"),
+    "healthcare": ("🏥", "HEALTHCARE"),
+    "finance": ("🏦", "FINANCE"),
 }
-_DEFAULT_EMOJI = "⚪"
+_DEFAULT_BADGE = ("📰", "NEWS")
 
 
-def _pick_emoji(tags: list[str]) -> str:
-    """Pick a severity emoji based on article tags."""
+def _pick_badge(tags: list[str]) -> str:
+    """Pick an emoji + label badge based on article tags."""
     for tag in tags:
-        if tag in _TAG_EMOJI:
-            return _TAG_EMOJI[tag]
-    return _DEFAULT_EMOJI
+        if tag in _TAG_BADGE:
+            emoji, label = _TAG_BADGE[tag]
+            return f"{emoji} [{label}]"
+    return f"{_DEFAULT_BADGE[0]} [{_DEFAULT_BADGE[1]}]"
 
 
 def build_digest_blocks(
@@ -97,10 +106,10 @@ def _append_article_blocks(
     """Append Block Kit blocks for a single article."""
 
     trans: Translation | None = article.translations.get(lang) if lang else None
-    emoji = _pick_emoji(article.tags)
+    badge = _pick_badge(article.tags)
 
-    # Title with severity emoji + link
-    title_text = f"{emoji}  *<{article.url}|{_escape(article.title)}>*"
+    # Title with badge + link
+    title_text = f"{badge}  *<{article.url}|{_escape(article.title)}>*"
     if trans:
         title_text += f"\n{_escape(trans.title)}"
 
