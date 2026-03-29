@@ -11,8 +11,29 @@ def main() -> None:
     subparsers = parser.add_subparsers(dest="command")
 
     # collect
-    collect_parser = subparsers.add_parser("collect", help="Collect news articles for a genre and date range")
-    collect_parser.add_argument("--genre", "-g", default="cybersecurity", help="News genre to collect (default: cybersecurity)")
+    collect_parser = subparsers.add_parser(
+        "collect",
+        help="Collect news articles for topics and date range",
+        epilog="""\
+examples:
+  news-collector collect --topics topics.toml
+  news-collector collect --genre cybersecurity --keywords "ransomware,zero-day"
+  news-collector collect --genre ai --from 2026-03-01 --to 2026-03-31""",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    source_group = collect_parser.add_mutually_exclusive_group()
+    source_group.add_argument(
+        "--topics", "-t", metavar="FILE",
+        help="TOML file defining topics and keywords (recommended for batch)",
+    )
+    source_group.add_argument(
+        "--genre", "-g", default=None,
+        help="Single genre to collect (default: cybersecurity if no --topics)",
+    )
+    collect_parser.add_argument(
+        "--keywords", "-k", default=None,
+        help="Comma-separated keywords to focus the search (used with --genre)",
+    )
     collect_parser.add_argument("--from", dest="from_date", help="Start date (YYYY-MM-DD, default: yesterday)")
     collect_parser.add_argument("--to", dest="to_date", help="End date (YYYY-MM-DD, default: yesterday)")
     collect_parser.add_argument("--db", default="news.db", help="SQLite database path (default: news.db)")

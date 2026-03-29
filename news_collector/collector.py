@@ -20,6 +20,7 @@ from pydantic import BaseModel, Field
 
 from news_collector.models import Article
 from news_collector.storage import Storage
+from news_collector.topics import Topic, load_topics, topic_from_genre
 
 _T = TypeVar("_T")
 
@@ -75,15 +76,25 @@ Requirements:
 """
 
 
-def _build_search_prompt(genre: str, from_date: str, to_date: str) -> str:
-    return (
+def _build_search_prompt(
+    genre: str, from_date: str, to_date: str, keywords: list[str] | None = None
+) -> str:
+    parts = [
         f"Search for recent news articles about **{genre}** "
-        f"published between {from_date} and {to_date}.\n\n"
-        f"Find notable incidents, announcements, vulnerabilities, "
+        f"published between {from_date} and {to_date}.",
+    ]
+    if keywords:
+        kw_str = ", ".join(f'"{k}"' for k in keywords)
+        parts.append(
+            f"\nFocus especially on articles related to these keywords: {kw_str}."
+        )
+    parts.append(
+        f"\nFind notable incidents, announcements, vulnerabilities, "
         f"breaches, policy changes, and other significant developments "
-        f"in the {genre} space during this period.\n\n"
-        f"Return all distinct articles you can find."
+        f"in the {genre} space during this period."
+        f"\n\nReturn all distinct articles you can find."
     )
+    return "\n".join(parts)
 
 
 # ──────────────────────────────────────────────
@@ -142,22 +153,44 @@ def run_collect(args: argparse.Namespace) -> None:
     from_date = args.from_date or yesterday
     to_date = args.to_date or yesterday
 
-    print(f"Collecting: genre={args.genre}, from={from_date}, to={to_date}", file=sys.stderr)
-
-    articles = search_news(args.genre, from_date, to_date, verbose=args.verbose)
+    # Build topic list from --topics file or --genre/--keywords flags
+    if args.topics:
+        topics = load_topics(args.topics)
+    else:
+        genre = args.genre or "cybersecurity"
+        keywords = [k.strip() for k in args.keywords.split(",")] if args.keywords else []
+        topics = [topic_from_genre(genre, keywords)]
 
     storage = Storage(args.db, args.jsonl)
     try:
-        new_count = 0
-        for article in articles:
-            if storage.insert(article):
-                new_count += 1
-                if args.verbose:
-                    print(f"  + {article.title}", file=sys.stderr)
-            elif args.verbose:
-                print(f"  = {article.title} (duplicate)", file=sys.stderr)
+        total_new = 0
+        total_found = 0
+        for topic in topics:
+            kw_display = f" (keywords: {', '.join(topic.keywords)})" if topic.keywords else ""
+            print(
+                f"\nCollecting: topic={topic.name}{kw_display}, "
+                f"from={from_date}, to={to_date}",
+                file=sys.stderr,
+            )
+
+            articles = search_news(
+                topic.name, from_date, to_date,
+                keywords=topic.keywords,
+                verbose=args.verbose,
+            )
+            total_found += len(articles)
+
+            for article in articles:
+                if storage.insert(article):
+                    total_new += 1
+                    if args.verbose:
+                        print(f"  + {article.title}", file=sys.stderr)
+                elif args.verbose:
+                    print(f"  = {article.title} (duplicate)", file=sys.stderr)
+
         print(
-            f"Done: {new_count} new articles collected ({len(articles)} total found)",
+            f"\nDone: {total_new} new articles collected "
+            f"({total_found} total found across {len(topics)} topic(s))",
             file=sys.stderr,
         )
     finally:
@@ -165,20 +198,28 @@ def run_collect(args: argparse.Namespace) -> None:
 
 
 def search_news(
-    genre: str, from_date: str, to_date: str, *, verbose: bool = False
+    genre: str,
+    from_date: str,
+    to_date: str,
+    *,
+    keywords: list[str] | None = None,
+    verbose: bool = False,
 ) -> list[Article]:
     """Search for news articles using Gemini with Google Search Grounding.
 
-    Two-step process:
+    Three-step process:
     1. Use Grounding to search the web and collect raw research text
-    2. Use structured output to extract individual articles from the text
+    2. Resolve redirect URLs to actual source URLs
+    3. Use structured output to extract individual articles from the text
     """
     client = _make_client()
     now = datetime.now()
 
     # Step 1: Search with Grounding
     print("  [Step 1] Searching with Google Search Grounding...", file=sys.stderr)
-    raw_text, ref_urls = _search_with_grounding(client, genre, from_date, to_date, verbose)
+    raw_text, ref_urls = _search_with_grounding(
+        client, genre, from_date, to_date, verbose, keywords=keywords
+    )
 
     if not raw_text.strip():
         print("  No results from search.", file=sys.stderr)
@@ -228,13 +269,15 @@ def _search_with_grounding(
     from_date: str,
     to_date: str,
     verbose: bool,
+    *,
+    keywords: list[str] | None = None,
 ) -> tuple[str, list[str]]:
     """Use Gemini + Google Search Grounding to find news articles.
 
     Returns (raw_text, reference_urls) where reference_urls are the actual
     source URLs discovered by Grounding.
     """
-    prompt = _build_search_prompt(genre, from_date, to_date)
+    prompt = _build_search_prompt(genre, from_date, to_date, keywords)
 
     def _run() -> tuple[str, list[str]]:
         parts: list[str] = []

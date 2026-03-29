@@ -1,0 +1,17 @@
+## news-collector topic configuration
+## Copy to topics.toml and customize.
+##
+## Usage:
+##   news-collector collect --topics topics.toml
+
+[[topics]]
+name = "cybersecurity"
+keywords = ["data breach", "ransomware", "vulnerability", "zero-day", "APT"]
+
+[[topics]]
+name = "ai-security"
+keywords = ["AI security", "LLM vulnerability", "prompt injection", "AI regulation"]
+
+# [[topics]]
+# name = "cloud-security"
+# keywords = ["cloud breach", "AWS security", "Azure vulnerability", "container escape"]
