@@ -65,10 +65,12 @@ def create_app(db_path: str) -> FastAPI:
         q: str = "",
         lang: str = "",
         page: int = Query(1, ge=1),
+        from_date: str = Query("", alias="from"),
+        to_date: str = Query("", alias="to"),
     ):
         storage = _storage()
         try:
-            articles = storage.get_all()
+            articles = storage.get_all(from_date=from_date or None, to_date=to_date or None)
 
             if genre:
                 articles = [a for a in articles if a.genre == genre]
@@ -94,10 +96,15 @@ def create_app(db_path: str) -> FastAPI:
             start = (page - 1) * per_page
             page_articles = articles[start:start + per_page]
 
-            # Collect available genres and languages for filters
+            # Collect available genres, tags, and languages for filters
             all_articles = storage.get_all()
             all_genres = sorted(set(a.genre for a in all_articles))
             all_langs = _get_available_languages(storage)
+            tags_count: dict[str, int] = {}
+            for a in all_articles:
+                for t in a.tags:
+                    tags_count[t] = tags_count.get(t, 0) + 1
+            all_tags = sorted(tags_count.items(), key=lambda x: -x[1])[:50]
 
             return _TEMPLATES.TemplateResponse(request, "articles.html", {
                 "articles": page_articles,
@@ -108,8 +115,11 @@ def create_app(db_path: str) -> FastAPI:
                 "tag": tag,
                 "q": q,
                 "lang": lang,
+                "from_date": from_date,
+                "to_date": to_date,
                 "all_genres": all_genres,
                 "all_langs": all_langs,
+                "all_tags": all_tags,
             })
         finally:
             storage.close()
