@@ -25,7 +25,7 @@ RUN uv tool install .
 ARG SWRITE_VERSION=v0.3.0
 RUN curl -fsSL "https://github.com/nlink-jp/swrite/releases/download/${SWRITE_VERSION}/swrite-linux-amd64.zip" \
       -o /tmp/swrite.zip && \
-    unzip /tmp/swrite.zip -d /tmp/swrite && \
+    unzip -o /tmp/swrite.zip -d /tmp/swrite || true && \
     cp /tmp/swrite/swrite-linux-amd64 /usr/local/bin/swrite && \
     chmod +x /usr/local/bin/swrite && \
     rm -rf /tmp/swrite*
