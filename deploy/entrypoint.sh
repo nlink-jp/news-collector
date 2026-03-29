@@ -31,6 +31,7 @@ echo "[$(date -Iseconds)] Starting news-collector job"
 echo "  Project:  ${GOOGLE_CLOUD_PROJECT}"
 echo "  Bucket:   gs://${BUCKET}"
 echo "  Topics:   ${TOPICS}"
+echo "  Timezone: ${TZ:-UTC}"
 echo "  Language: ${LANG}"
 echo "  Mode:     ${MODE}"
 

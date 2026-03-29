@@ -153,6 +153,7 @@ gcloud scheduler jobs create http news-collector-daily \
 
 | Variable | Required | Description |
 |---|---|---|
+| `TZ` | yes | Timezone (e.g. `Asia/Tokyo`). Container defaults to UTC — "yesterday" will be wrong without this. |
 | `GOOGLE_CLOUD_PROJECT` | yes | GCP project ID |
 | `GOOGLE_CLOUD_LOCATION` | no | Vertex AI region (default: us-central1) |
 | `GCS_BUCKET` | yes | GCS bucket for news.db |

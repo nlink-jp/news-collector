@@ -28,6 +28,8 @@ spec:
                   memory: "512Mi"
                   cpu: "1"
               env:
+                - name: TZ
+                  value: "Asia/Tokyo"
                 - name: GOOGLE_CLOUD_PROJECT
                   value: "PROJECT_ID"
                 - name: GOOGLE_CLOUD_LOCATION

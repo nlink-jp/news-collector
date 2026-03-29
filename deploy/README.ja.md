@@ -156,6 +156,7 @@ gcloud scheduler jobs create http news-collector-daily \
 
 | 変数 | 必須 | 説明 |
 |---|---|---|
+| `TZ` | はい | タイムゾーン（例: `Asia/Tokyo`）。コンテナのデフォルトは UTC のため、未設定だと「昨日」の日付がずれる。 |
 | `GOOGLE_CLOUD_PROJECT` | はい | GCP プロジェクト ID |
 | `GOOGLE_CLOUD_LOCATION` | いいえ | Vertex AI リージョン（デフォルト: us-central1） |
 | `GCS_BUCKET` | はい | news.db を保存する GCS バケット |
