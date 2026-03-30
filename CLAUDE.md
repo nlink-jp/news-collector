@@ -63,6 +63,8 @@ gcloud auth application-default login
 - Genre is a parameter, not hardcoded — primary use case is cybersecurity but not limited to it
 - Translation uses a separate `translations` table (article_id + lang composite PK) for multi-language support
 - notify/curate output JSONL (one JSON line per article); designed to pipe to swrite for individual Slack posts
+- notify/curate track notified_at — only unposted articles are output; prevents duplicate Slack notifications
+- Cloud Run deployment: deploy/ contains Dockerfile, entrypoint.sh, cloudrunjob.yaml template, setup guides (EN/JA)
 - curate uses `generate_commentary()` in processor.py for AI analyst comments
 - retry.py provides `call_with_retry()` — used by collector and processor for all Gemini API calls
 - Web UI uses parameterized SQL (SQLi prevention), safe_url filter and tojson (XSS prevention)

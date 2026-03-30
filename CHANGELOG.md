@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2026-03-30
+
+### Added
+- **Cloud Run Job deployment** — Serverless daily batch execution on GCP
+  - Dockerfile with news-collector + swrite pre-installed
+  - entrypoint.sh: GCS sync → collect → process → curate → Slack → GCS sync
+  - cloudrunjob.yaml template with Secret Manager integration
+  - deploy/README.md and deploy/README.ja.md with step-by-step setup guide
+  - Actual cost data: ~$0.22/run, ~$6.50/month (daily, 1 topic)
+- **Notification tracking** (`notified_at` column) — notify/curate commands
+  now only output articles that have not been posted yet. Prevents duplicate
+  Slack notifications on repeated execution.
+  - Automatic schema migration for existing databases
+- **Web UI notification status** — Dashboard shows "Posted to Slack" count;
+  article list has Posted/Pending badges and Status filter
+
+### Fixed
+- **Timezone handling** — Added `TZ` environment variable to Cloud Run config.
+  Without it, container defaults to UTC and "yesterday" is off by a day in JST.
+- **swrite zip extraction** — Work around `../README.md` relative path in
+  swrite release zip archives
+
 ## [0.1.0] - 2026-03-29
 
 ### Added

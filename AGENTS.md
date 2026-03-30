@@ -46,6 +46,8 @@ tests/
 - **Three idempotent steps**: tagging (`processed_at`), summarization (same), and translation (`translations` table PK). Each skips already-completed work.
 - **URL resolution**: Grounding returns redirect URLs (`vertexaisearch.cloud.google.com`); collector resolves them to actual source URLs via HTTP HEAD.
 - **Multi-topic config**: `topics.toml` defines topics + keywords + languages. Both `collect` and `process` accept `--topics`.
+- **Notification tracking**: notify/curate mark articles as `notified_at` after output. Re-running only posts new articles.
+- **TZ required in Cloud Run**: container defaults to UTC. Set `TZ=Asia/Tokyo` to get correct "yesterday" in JST.
 - **Date handling**: `--from` / `--to` are inclusive. Default is yesterday for `collect`, no default for `process` (processes all unprocessed).
 - **Module path**: `github.com/nlink-jp/news-collector` (Python package: `news_collector`).
 - **Env vars**: `GOOGLE_CLOUD_PROJECT` (required), `GOOGLE_CLOUD_LOCATION` (optional, default `us-central1`).

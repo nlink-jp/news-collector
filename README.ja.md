@@ -17,7 +17,9 @@ Gemini + Google Search Grounding でニュース記事を自動収集し、構�
 - **Slack 通知** — 記事を Slack Block Kit JSON（JSONL）で出力。[swrite](https://github.com/nlink-jp/swrite) にパイプして投稿。タグベースの絵文字バッジ付き
 - **AI キュレーション** — Gemini Flash がフレンドリーなアナリストコメントを記事ごとに生成して Slack 配信
 - **Web ダッシュボード** — FastAPI + Jinja2 のローカル UI。記事一覧（フィルタ/ソート/検索/日付範囲/タグ/言語切替）、記事詳細、ダーク/ライトモード対応
-- **冪等処理** — タグ付け・要約・翻訳の各ステップは処理済みをスキップ。再実行しても安全
+- **投稿追跡** — Slack 投稿済みの記事を記録。notify/curate の再実行で重複投稿しない
+- **冪等処理** — タグ付け・要約・翻訳・投稿の各ステップは処理済みをスキップ。再実行しても安全
+- **Cloud Run デプロイ** — GCP 上のサーバーレスデイリーバッチ。GCS 永続化対応。[deploy/](deploy/) にセットアップガイド
 - **堅牢なリトライ** — 共通の指数バックオフ（6回、最大120秒）で Gemini 429/RESOURCE_EXHAUSTED エラーに対応
 - **セキュリティ対策** — SQLi 防止（パラメータバインド）、XSS 防止（tojson フィルタ、safe_url）
 - **バッチ実行対応** — cron / launchd でのデイリー実行を想定

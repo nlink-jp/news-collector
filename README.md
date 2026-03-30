@@ -17,7 +17,9 @@ Designed for daily batch execution to build a reusable, structured, multilingual
 - **Slack notification** — Output articles as Slack Block Kit JSON (JSONL); pipe to [swrite](https://github.com/nlink-jp/swrite) for posting. Tag-based emoji badges per article
 - **AI-curated commentary** — Gemini Flash generates friendly analyst comments for each article before Slack delivery
 - **Web dashboard** — FastAPI + Jinja2 local UI with article listing (filter/sort/search/date range/tag/language), detail view, and dark/light mode
-- **Idempotent processing** — All steps (tagging, summarization, translation) skip already-completed work; safe to re-run
+- **Notification tracking** — Articles are marked as posted after Slack delivery; re-running notify/curate only posts new articles
+- **Idempotent processing** — All steps (tagging, summarization, translation, notification) skip already-completed work; safe to re-run
+- **Cloud Run deployment** — Serverless daily batch on GCP with GCS persistence; see [deploy/](deploy/) for setup guide
 - **Robust retry** — Shared exponential backoff (6 retries, max 120s) for Gemini 429/RESOURCE_EXHAUSTED errors
 - **Security hardened** — SQLi prevention (parameter binding), XSS prevention (tojson filter, safe_url)
 - **Batch-friendly** — Designed for cron/launchd daily execution
