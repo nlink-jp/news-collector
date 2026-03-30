@@ -20,7 +20,8 @@ CREATE TABLE IF NOT EXISTS articles (
     collected_at   TEXT NOT NULL,
     tags           TEXT NOT NULL DEFAULT '[]',
     summary        TEXT NOT NULL DEFAULT '',
-    processed_at   TEXT
+    processed_at   TEXT,
+    notified_at    TEXT
 );
 
 CREATE TABLE IF NOT EXISTS translations (
@@ -34,6 +35,11 @@ CREATE TABLE IF NOT EXISTS translations (
 );
 """
 
+# Migration for existing databases that lack notified_at
+_MIGRATIONS = [
+    "ALTER TABLE articles ADD COLUMN notified_at TEXT",
+]
+
 
 class Storage:
     """SQLite + optional JSONL dual storage."""
@@ -42,8 +48,17 @@ class Storage:
         self._db = sqlite3.connect(db_path)
         self._db.row_factory = sqlite3.Row
         self._db.executescript(_SCHEMA)
+        self._run_migrations()
         self._db.commit()
         self._jsonl_path = jsonl_path
+
+    def _run_migrations(self) -> None:
+        """Apply schema migrations for existing databases."""
+        for sql in _MIGRATIONS:
+            try:
+                self._db.execute(sql)
+            except sqlite3.OperationalError:
+                pass  # Column already exists
 
     def close(self) -> None:
         self._db.close()
@@ -114,6 +129,32 @@ class Storage:
         self._db.execute(
             "UPDATE articles SET tags = ?, summary = ?, processed_at = ? WHERE id = ?",
             (json.dumps(tags, ensure_ascii=False), summary, processed_at, article_id),
+        )
+        self._db.commit()
+
+    # ── Notification tracking ──
+
+    def get_unnotified(
+        self, from_date: str | None = None, to_date: str | None = None
+    ) -> list[Article]:
+        """Return processed articles that have not been notified yet."""
+        query = "SELECT * FROM articles WHERE processed_at IS NOT NULL AND notified_at IS NULL"
+        params: list[str] = []
+        if from_date:
+            query += " AND collected_at >= ?"
+            params.append(from_date)
+        if to_date:
+            query += " AND collected_at <= ?"
+            params.append(to_date + "T23:59:59")
+        query += " ORDER BY collected_at DESC"
+        rows = self._db.execute(query, params).fetchall()
+        return [self._row_to_article(r) for r in rows]
+
+    def mark_notified(self, article_id: str, notified_at: str) -> None:
+        """Mark an article as notified."""
+        self._db.execute(
+            "UPDATE articles SET notified_at = ? WHERE id = ?",
+            (notified_at, article_id),
         )
         self._db.commit()
 

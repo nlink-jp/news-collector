@@ -118,80 +118,88 @@ examples:
         uvicorn.run(app, host=args.host, port=args.port, log_level="warning")
 
 
-def _load_articles_for_output(args) -> list:
-    """Load and filter articles for notify/curate commands."""
-    from news_collector.storage import Storage
+def _load_unnotified_articles(args, storage):
+    """Load unnotified articles for notify/curate commands."""
+    articles = storage.get_unnotified(
+        from_date=args.from_date or None,
+        to_date=args.to_date or None,
+    )
+    if args.genre:
+        articles = [a for a in articles if a.genre == args.genre]
 
-    storage = Storage(args.db)
-    try:
-        articles = storage.get_all(
-            from_date=args.from_date or None,
-            to_date=args.to_date or None,
-        )
-        if args.genre:
-            articles = [a for a in articles if a.genre == args.genre]
-        # Only include processed articles
-        articles = [a for a in articles if a.processed_at]
+    if args.lang:
+        for a in articles:
+            a.translations = storage.get_translations(a.id)
 
-        if args.lang:
-            for a in articles:
-                a.translations = storage.get_translations(a.id)
+    if args.limit and args.limit > 0:
+        articles = articles[:args.limit]
 
-        if args.limit and args.limit > 0:
-            articles = articles[:args.limit]
-
-        return articles
-    finally:
-        storage.close()
+    return articles
 
 
 def _run_notify(args) -> None:
     import json
+    from datetime import datetime
     from news_collector.slack import build_single_article_blocks
+    from news_collector.storage import Storage
 
-    articles = _load_articles_for_output(args)
-    if not articles:
-        print("No articles to notify.", file=sys.stderr)
-        sys.exit(0)
+    storage = Storage(args.db)
+    try:
+        articles = _load_unnotified_articles(args, storage)
+        if not articles:
+            print("No new articles to notify.", file=sys.stderr)
+            return
 
-    for article in articles:
-        blocks = build_single_article_blocks(article, lang=args.lang)
-        print(json.dumps(blocks, ensure_ascii=False))
+        for article in articles:
+            blocks = build_single_article_blocks(article, lang=args.lang)
+            print(json.dumps(blocks, ensure_ascii=False))
+            storage.mark_notified(article.id, datetime.now().isoformat())
+
+        print(f"Notified: {len(articles)} articles.", file=sys.stderr)
+    finally:
+        storage.close()
 
 
 def _run_curate(args) -> None:
     import json
     import os
+    from datetime import datetime
     from google import genai
     from news_collector.processor import generate_commentary
     from news_collector.slack import build_single_article_blocks
+    from news_collector.storage import Storage
 
-    articles = _load_articles_for_output(args)
-    if not articles:
-        print("No articles to curate.", file=sys.stderr)
-        sys.exit(0)
+    storage = Storage(args.db)
+    try:
+        articles = _load_unnotified_articles(args, storage)
+        if not articles:
+            print("No new articles to curate.", file=sys.stderr)
+            return
 
-    client = genai.Client(
-        vertexai=True,
-        project=os.environ["GOOGLE_CLOUD_PROJECT"],
-        location=os.environ.get("GOOGLE_CLOUD_LOCATION", "us-central1"),
-    )
-
-    print(f"Generating commentary for {len(articles)} articles...", file=sys.stderr)
-    for i, article in enumerate(articles):
-        source_summary = article.summary or article.summary_raw
-        commentary = generate_commentary(
-            client, article.title, source_summary, article.tags, lang=args.lang,
+        client = genai.Client(
+            vertexai=True,
+            project=os.environ["GOOGLE_CLOUD_PROJECT"],
+            location=os.environ.get("GOOGLE_CLOUD_LOCATION", "us-central1"),
         )
-        if getattr(args, "verbose", False):
-            print(f"  ✓ [{i + 1}/{len(articles)}] {article.title}", file=sys.stderr)
 
-        blocks = build_single_article_blocks(
-            article, lang=args.lang, commentary=commentary,
-        )
-        print(json.dumps(blocks, ensure_ascii=False))
+        print(f"Generating commentary for {len(articles)} articles...", file=sys.stderr)
+        for i, article in enumerate(articles):
+            source_summary = article.summary or article.summary_raw
+            commentary = generate_commentary(
+                client, article.title, source_summary, article.tags, lang=args.lang,
+            )
+            if getattr(args, "verbose", False):
+                print(f"  ✓ [{i + 1}/{len(articles)}] {article.title}", file=sys.stderr)
 
-    print(f"Done: {len(articles)} articles.", file=sys.stderr)
+            blocks = build_single_article_blocks(
+                article, lang=args.lang, commentary=commentary,
+            )
+            print(json.dumps(blocks, ensure_ascii=False))
+            storage.mark_notified(article.id, datetime.now().isoformat())
+
+        print(f"Done: {len(articles)} articles.", file=sys.stderr)
+    finally:
+        storage.close()
 
 
 if __name__ == "__main__":

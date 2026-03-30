@@ -81,3 +81,51 @@ def test_jsonl_output():
         lines = Path(jsonl).read_text().strip().splitlines()
         assert len(lines) == 1
         assert '"Test Article"' in lines[0]
+
+
+def test_get_unnotified():
+    with tempfile.TemporaryDirectory() as tmp:
+        db = str(Path(tmp) / "test.db")
+        storage = Storage(db)
+
+        # Insert and process an article
+        article = _make_article()
+        storage.insert(article)
+        storage.update_processed(
+            article.id,
+            tags=["test"],
+            summary="Test summary.",
+            processed_at="2026-03-29T13:00:00",
+        )
+
+        # Should appear in unnotified
+        unnotified = storage.get_unnotified()
+        assert len(unnotified) == 1
+
+        # Mark as notified
+        storage.mark_notified(article.id, "2026-03-29T14:00:00")
+
+        # Should no longer appear
+        unnotified = storage.get_unnotified()
+        assert len(unnotified) == 0
+
+        # But still in get_all
+        all_articles = storage.get_all()
+        assert len(all_articles) == 1
+        assert all_articles[0].notified_at is not None
+        storage.close()
+
+
+def test_get_unnotified_skips_unprocessed():
+    with tempfile.TemporaryDirectory() as tmp:
+        db = str(Path(tmp) / "test.db")
+        storage = Storage(db)
+
+        # Insert but don't process
+        article = _make_article()
+        storage.insert(article)
+
+        # Unprocessed articles should not appear in unnotified
+        unnotified = storage.get_unnotified()
+        assert len(unnotified) == 0
+        storage.close()

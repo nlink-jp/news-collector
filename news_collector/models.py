@@ -21,6 +21,7 @@ class Article(BaseModel):
     tags: list[str] = Field(default_factory=list, description="Auto-generated tags")
     summary: str = Field(default="", description="Gemini Flash summary")
     processed_at: datetime | None = Field(default=None, description="Processing timestamp")
+    notified_at: datetime | None = Field(default=None, description="Notification timestamp")
 
     # Populated by get methods when translations are loaded
     translations: dict[str, "Translation"] = Field(
