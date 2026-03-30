@@ -46,6 +46,14 @@
       </div>
     </div>
     {% endif %}
+    <div class="filter-group">
+      <label class="filter-label">Status</label>
+      <div class="lang-pills">
+        <span class="lang-pill {{ 'active' if not notified }}" onclick="setNotified('')">All</span>
+        <span class="lang-pill {{ 'active' if notified == 'yes' }}" onclick="setNotified('yes')">Posted</span>
+        <span class="lang-pill {{ 'active' if notified == 'no' }}" onclick="setNotified('no')">Pending</span>
+      </div>
+    </div>
   </div>
 
   {# ── Row 2: Genre tabs ── #}
@@ -87,6 +95,7 @@
   {% if q %}<span class="active-chip">search: "{{ q }}" <span class="chip-x" onclick="clearSearch()">&times;</span></span>{% endif %}
   {% if from_date %}<span class="active-chip">from: {{ from_date }} <span class="chip-x" onclick="clearDate('from')">&times;</span></span>{% endif %}
   {% if to_date %}<span class="active-chip">to: {{ to_date }} <span class="chip-x" onclick="clearDate('to')">&times;</span></span>{% endif %}
+  {% if notified %}<span class="active-chip">status: {{ notified }} <span class="chip-x" onclick="setNotified('')">&times;</span></span>{% endif %}
   {% if lang %}<span class="active-chip">lang: {{ lang }} <span class="chip-x" onclick="setLang('')">&times;</span></span>{% endif %}
   <span class="filter-clear" onclick="window.location='/articles'">Clear all</span>
 </div>
@@ -108,6 +117,11 @@
     <span>{{ article.source }}</span>
     {% if article.published_date %}<span>{{ article.published_date }}</span>{% endif %}
     <span class="tag" style="font-size: 11px;">{{ article.genre }}</span>
+    {% if article.notified_at %}
+    <span class="tag" style="font-size: 11px; background: var(--success, #16a34a); color: white;">Posted</span>
+    {% else %}
+    <span class="tag" style="font-size: 11px; background: var(--warning, #d97706); color: white;">Pending</span>
+    {% endif %}
   </div>
   {% if article.url %}
   <div class="article-url"><a href="{{ article.url | safe_url }}" target="_blank" rel="noopener">{{ article.url | truncate(80, True) }}</a></div>
@@ -141,19 +155,19 @@
 {% if total_pages > 1 %}
 <div class="pagination">
   {% if page > 1 %}
-  <a href="/articles?page={{ page - 1 }}&genre={{ genre }}&tag={{ tag }}&q={{ q }}&lang={{ lang }}&from={{ from_date }}&to={{ to_date }}&sort={{ sort }}">&laquo; Prev</a>
+  <a href="/articles?page={{ page - 1 }}&genre={{ genre }}&tag={{ tag }}&q={{ q }}&lang={{ lang }}&from={{ from_date }}&to={{ to_date }}&sort={{ sort }}&notified={{ notified }}">&laquo; Prev</a>
   {% endif %}
   {% for p in range(1, total_pages + 1) %}
     {% if p == page %}
     <span class="current">{{ p }}</span>
     {% elif p <= 3 or p > total_pages - 2 or (p >= page - 1 and p <= page + 1) %}
-    <a href="/articles?page={{ p }}&genre={{ genre }}&tag={{ tag }}&q={{ q }}&lang={{ lang }}&from={{ from_date }}&to={{ to_date }}&sort={{ sort }}">{{ p }}</a>
+    <a href="/articles?page={{ p }}&genre={{ genre }}&tag={{ tag }}&q={{ q }}&lang={{ lang }}&from={{ from_date }}&to={{ to_date }}&sort={{ sort }}&notified={{ notified }}">{{ p }}</a>
     {% elif p == 4 or p == total_pages - 2 %}
     <span style="color: var(--text-secondary);">...</span>
     {% endif %}
   {% endfor %}
   {% if page < total_pages %}
-  <a href="/articles?page={{ page + 1 }}&genre={{ genre }}&tag={{ tag }}&q={{ q }}&lang={{ lang }}&from={{ from_date }}&to={{ to_date }}&sort={{ sort }}">Next &raquo;</a>
+  <a href="/articles?page={{ page + 1 }}&genre={{ genre }}&tag={{ tag }}&q={{ q }}&lang={{ lang }}&from={{ from_date }}&to={{ to_date }}&sort={{ sort }}&notified={{ notified }}">Next &raquo;</a>
   {% endif %}
 </div>
 {% endif %}
@@ -164,6 +178,7 @@
   var _tag = {{ tag | tojson }};
   var _lang = {{ lang | tojson }};
   var _sort = {{ sort | tojson }};
+  var _notified = {{ notified | tojson }};
 
   function buildUrl(overrides) {
     var p = {
@@ -172,6 +187,7 @@
       q: overrides.q !== undefined ? overrides.q : document.getElementById('f-q').value,
       lang: overrides.lang !== undefined ? overrides.lang : _lang,
       sort: overrides.sort !== undefined ? overrides.sort : _sort,
+      notified: overrides.notified !== undefined ? overrides.notified : _notified,
       from: overrides.from !== undefined ? overrides.from : (document.getElementById('f-from').value || ''),
       to: overrides.to !== undefined ? overrides.to : (document.getElementById('f-to').value || ''),
     };
@@ -189,6 +205,7 @@
     o[which] = '';
     window.location = buildUrl(o);
   }
+  function setNotified(n) { window.location = buildUrl({notified: n}); }
   function toggleSort() { window.location = buildUrl({sort: _sort === "asc" ? "desc" : "asc"}); }
   function applyFilters() { window.location = buildUrl({}); }
 

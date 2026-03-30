@@ -53,8 +53,11 @@ def create_app(db_path: str) -> FastAPI:
             top_tags = sorted(tags_count.items(), key=lambda x: -x[1])[:30]
             sorted_dates = sorted(dates.items())
 
+            notified_count = sum(1 for a in articles if a.notified_at)
+
             return _TEMPLATES.TemplateResponse(request, "dashboard.html", {
                 "total": len(articles),
+                "notified": notified_count,
                 "tagged": sum(1 for a in articles if a.processed_at),
                 "genres": sorted(genres.items(), key=lambda x: -x[1]),
                 "top_tags": top_tags,
@@ -77,6 +80,7 @@ def create_app(db_path: str) -> FastAPI:
         from_date: str = Query("", alias="from"),
         to_date: str = Query("", alias="to"),
         sort: str = Query("desc"),
+        notified: str = Query(""),
     ):
         storage = _storage()
         try:
@@ -86,6 +90,11 @@ def create_app(db_path: str) -> FastAPI:
                 articles.sort(key=lambda a: a.collected_at)
             else:
                 articles.sort(key=lambda a: a.collected_at, reverse=True)
+            # Notification filter
+            if notified == "yes":
+                articles = [a for a in articles if a.notified_at]
+            elif notified == "no":
+                articles = [a for a in articles if not a.notified_at]
 
             if genre:
                 articles = [a for a in articles if a.genre == genre]
@@ -133,6 +142,7 @@ def create_app(db_path: str) -> FastAPI:
                 "sort": sort,
                 "from_date": from_date,
                 "to_date": to_date,
+                "notified": notified,
                 "all_genres": all_genres,
                 "all_langs": all_langs,
                 "all_tags": all_tags,
