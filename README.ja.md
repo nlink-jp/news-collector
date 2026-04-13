@@ -42,11 +42,32 @@ uv tool install .
 
 ## 設定
 
+### 設定ファイル（任意）
+
+`~/.config/news-collector/config.toml` を作成（[config.example.toml](config.example.toml) を参照）:
+
+```toml
+project  = "your-project-id"
+location = "us-central1"
+```
+
+設定の優先順位（高い順）:
+
+1. 環境変数（`NEWS_COLLECTOR_PROJECT`, `NEWS_COLLECTOR_LOCATION`）
+2. `GOOGLE_CLOUD_PROJECT` / `GOOGLE_CLOUD_LOCATION` 環境変数（フォールバック）
+3. 設定ファイル（`~/.config/news-collector/config.toml`）
+4. デフォルト値（location は `us-central1`）
+
 ### Google Cloud 認証
 
 ```bash
 gcloud auth application-default login
 
+# 方法 A: ツール固有の環境変数
+export NEWS_COLLECTOR_PROJECT="your-project-id"
+export NEWS_COLLECTOR_LOCATION="us-central1"  # 省略可（デフォルト: us-central1）
+
+# 方法 B: 共通環境変数（フォールバック）
 export GOOGLE_CLOUD_PROJECT="your-project-id"
 export GOOGLE_CLOUD_LOCATION="us-central1"  # 省略可（デフォルト: us-central1）
 ```

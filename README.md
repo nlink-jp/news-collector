@@ -42,11 +42,32 @@ uv tool install .
 
 ## Configuration
 
+### Config file (optional)
+
+Create `~/.config/news-collector/config.toml` (see [config.example.toml](config.example.toml)):
+
+```toml
+project  = "your-project-id"
+location = "us-central1"
+```
+
+Configuration priority (highest wins):
+
+1. Environment variables (`NEWS_COLLECTOR_PROJECT`, `NEWS_COLLECTOR_LOCATION`)
+2. `GOOGLE_CLOUD_PROJECT` / `GOOGLE_CLOUD_LOCATION` env var fallback
+3. Config file (`~/.config/news-collector/config.toml`)
+4. Defaults (`us-central1` for location)
+
 ### Google Cloud authentication
 
 ```bash
 gcloud auth application-default login
 
+# Option A: tool-specific env vars
+export NEWS_COLLECTOR_PROJECT="your-project-id"
+export NEWS_COLLECTOR_LOCATION="us-central1"  # optional, defaults to us-central1
+
+# Option B: cross-tool env vars (fallback)
 export GOOGLE_CLOUD_PROJECT="your-project-id"
 export GOOGLE_CLOUD_LOCATION="us-central1"  # optional, defaults to us-central1
 ```

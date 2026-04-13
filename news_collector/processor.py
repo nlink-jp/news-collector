@@ -64,10 +64,12 @@ Be factual. Do not speculate beyond what the input states.
 # ──────────────────────────────────────────────
 
 def _make_client() -> genai.Client:
+    from news_collector.config import get_config
+    cfg = get_config()
     return genai.Client(
         vertexai=True,
-        project=os.environ["GOOGLE_CLOUD_PROJECT"],
-        location=os.environ.get("GOOGLE_CLOUD_LOCATION", "us-central1"),
+        project=cfg["project"],
+        location=cfg["location"],
     )
 
 # ──────────────────────────────────────────────

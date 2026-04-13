@@ -176,10 +176,12 @@ def _run_curate(args) -> None:
             print("No new articles to curate.", file=sys.stderr)
             return
 
+        from news_collector.config import get_config
+        cfg = get_config()
         client = genai.Client(
             vertexai=True,
-            project=os.environ["GOOGLE_CLOUD_PROJECT"],
-            location=os.environ.get("GOOGLE_CLOUD_LOCATION", "us-central1"),
+            project=cfg["project"],
+            location=cfg["location"],
         )
 
         print(f"Generating commentary for {len(articles)} articles...", file=sys.stderr)
