@@ -3,13 +3,14 @@
 import tempfile
 from datetime import date, datetime
 from pathlib import Path
+from typing import Any
 
 from news_collector.models import Article
 from news_collector.storage import Storage
 
 
-def _make_article(url: str = "https://example.com/article-1", **kwargs) -> Article:
-    defaults = dict(
+def _make_article(url: str = "https://example.com/article-1", **kwargs: Any) -> Article:
+    defaults: dict[str, Any] = dict(
         id="abc123",
         title="Test Article",
         url=url,

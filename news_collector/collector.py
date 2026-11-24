@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import argparse
 import hashlib
-import json
 import os
 import sys
+import urllib.error
 import urllib.request
 
 from datetime import date, datetime, timedelta
@@ -16,6 +16,7 @@ from google.genai import types
 from pydantic import BaseModel, Field
 
 from news_collector.models import Article
+from news_collector.response import response_json
 from news_collector.retry import call_with_retry
 from news_collector.storage import Storage
 from news_collector.topics import Topic, load_topics, topic_from_genre
@@ -305,7 +306,7 @@ def _extract_articles(
                 response_schema=_NewsSearchResult,
             ),
         )
-        data = json.loads(response.text)
+        data = response_json(response.text, "extract")
         result = _NewsSearchResult(**data)
         return result.articles
 

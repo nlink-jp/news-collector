@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import argparse
-import json
 import os
 import sys
 
@@ -14,6 +13,7 @@ from google.genai import types
 from pydantic import BaseModel, Field
 
 from news_collector.models import Translation
+from news_collector.response import response_json
 from news_collector.retry import call_with_retry
 from news_collector.storage import Storage
 from news_collector.topics import load_config
@@ -94,7 +94,7 @@ def generate_tags_and_summary(
                 response_schema=_ProcessingResult,
             ),
         )
-        data = json.loads(response.text)
+        data = response_json(response.text, "process")
         result = _ProcessingResult(**data)
         return result.tags, result.summary
 
@@ -146,7 +146,7 @@ def translate_article(
                 response_schema=_TranslationResult,
             ),
         )
-        data = json.loads(response.text)
+        data = response_json(response.text, f"translate-{lang}")
         result = _TranslationResult(**data)
         return result.title, result.summary
 
@@ -198,7 +198,7 @@ def generate_commentary(
                 response_schema=_CurationResult,
             ),
         )
-        data = json.loads(response.text)
+        data = response_json(response.text, "curate")
         result = _CurationResult(**data)
         return result.commentary
 
