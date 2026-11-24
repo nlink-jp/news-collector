@@ -15,6 +15,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   repository. The container image installs with `uv tool install .`, which
   resolves dependencies when the image is built.
 
+### Fixed
+
+- A Gemini call that returns no text (a blocked or empty answer) now fails
+  with an error naming the call (`extract`, `process`, `translate-<lang>`,
+  `curate`) instead of a TypeError from `json.loads`.
+
+### Changed
+
+- A `Makefile` with `test`, `lint` (pyright) and `vuln` (`uv audit` on the
+  lock; fails on a known advisory). pyright's 18 existing errors are
+  cleared, so `make lint` passes.
+
 ## [0.2.1] - 2026-04-14
 
 ### Added

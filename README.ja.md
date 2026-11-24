@@ -256,8 +256,9 @@ Slack に投稿される各記事には以下が含まれる:
 
 ```bash
 uv sync           # 依存関係のインストール
-uv run pytest     # テスト実行
-uv run pyright    # 型チェック
+make test         # テスト実行（pytest）
+make lint         # 型チェック（pyright）
+make vuln         # uv audit: ロックした依存の既知の勧告
 ```
 
 ## 注意事項

@@ -260,8 +260,9 @@ Each article posted to Slack includes:
 
 ```bash
 uv sync           # install dependencies
-uv run pytest     # run tests
-uv run pyright    # type checking
+make test         # run tests (pytest)
+make lint         # type checking (pyright)
+make vuln         # uv audit: known advisories in the locked dependencies
 ```
 
 ## Notes

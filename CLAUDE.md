@@ -42,8 +42,9 @@ tests/
 
 ```sh
 uv sync           # install dependencies
-uv run pytest     # run tests
-uv run pyright    # type check
+make test         # run tests (pytest)
+make lint         # type check (pyright)
+make vuln         # uv audit: known advisories in the lock; run before tagging
 uv tool install . # install as CLI tool
 ```
 
