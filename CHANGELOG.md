@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Security
+
+- The locked dependency versions are upgraded. `uv audit` reported 28 known
+  advisories in the previous lock, all in transitive packages; the new lock
+  has none. This affects environments made with `uv sync` from the
+  repository. The container image installs with `uv tool install .`, which
+  resolves dependencies when the image is built.
+
 ## [0.2.1] - 2026-04-14
 
 ### Added
