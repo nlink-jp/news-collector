@@ -169,11 +169,19 @@ gcloud scheduler jobs create http news-collector-daily \
 | `DB_FILENAME` | いいえ | GCS 上の DB ファイル名（デフォルト: news.db） |
 | `TOPICS_FILE` | いいえ | topics.toml のパス（デフォルト: /app/topics.toml） |
 
-## 既知の問題
+## 固定している取得物
 
-- **swrite zip に `../README.md` が含まれる**: swrite リリースの zip アーカイブに
-  相対パス `../README.md` が含まれています。Dockerfile では `unzip -o ... || true`
-  で回避しており、動作に影響はありません。
+イメージには、リポジトリが正確に名指ししたものだけが入ります。作り直しても、
+確かめていない上流の新しい版が紛れ込むことはありません:
+
+- `python:3.11-slim` のベースと `uv` のイメージ（マルチアーキの索引の digest で固定）
+- Python の依存（`uv.lock` から。uv がすべてのハッシュを照合します。プロジェクト自身の
+  ビルドバックエンドは使わず、パッケージはソースのディレクトリから動かします）
+- swrite（正確なリリース `SWRITE_VERSION` と SHA-256 で固定）
+
+作り直しで入ってくるのは、`apt-get upgrade` による Debian 自身のセキュリティ更新だけです
+（署名は apt が検証します）。固定したものを動かすときは `deploy/Dockerfile` を編集する
+（または `uv.lock` を更新する）変更としてリリースします。
 
 ## コスト見積もり
 

@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Security
+
+- **The container image installs only pinned, checked inputs.** It used
+  `uv tool install .`, which resolved the Python dependencies afresh at build
+  time and ignored `uv.lock`; copied uv from the floating `uv:latest` image;
+  built on the floating `python:3.11-slim` tag; and downloaded swrite v0.3.0
+  without checking it (`unzip ... || true` also hid a failed unpack). Now the
+  base and uv images are pinned by index digest, the dependencies come from
+  `uv.lock` with every hash verified (`uv sync --frozen --no-install-project`;
+  the project's unlocked build backend is not used, and the package runs from
+  its source directory), and swrite v0.5.1 is pinned by SHA-256. A wrong
+  swrite hash or a tampered lock hash stops the build. Debian's signed
+  updates are applied with `apt-get upgrade`. A deployed job keeps its old
+  image until it is rebuilt and redeployed (`deploy/README.md` → Updating).
+
+### Fixed
+
+- `--help` says `news-collector` (not `cli.py`) when started with
+  `python -m news_collector.cli`, as the container now does.
+
 ## [0.2.2] - 2026-11-25
 
 ### Security

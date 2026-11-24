@@ -166,11 +166,19 @@ gcloud scheduler jobs create http news-collector-daily \
 | `DB_FILENAME` | no | Database filename in GCS (default: news.db) |
 | `TOPICS_FILE` | no | Path to topics.toml (default: /app/topics.toml) |
 
-## Known Issues
+## Pinned inputs
 
-- **swrite zip contains `../README.md`**: the zip archives from swrite releases
-  include a relative path `../README.md`. The Dockerfile uses `unzip -o ... || true`
-  to work around the resulting warning. This does not affect functionality.
+The image installs only what the repository names exactly, so a rebuild cannot
+pick up an unreviewed upstream release:
+
+- the `python:3.11-slim` base and the `uv` image, by their multi-arch index digest
+- the Python dependencies, from `uv.lock` (uv verifies every hash; the project's
+  own build backend is not used — the package runs from its source directory)
+- swrite, by exact release (`SWRITE_VERSION`) and SHA-256
+
+Debian's own security updates are the one thing a rebuild takes in, through
+`apt-get upgrade` (apt verifies their signatures). To move any pinned input,
+edit it in `deploy/Dockerfile` (or update `uv.lock`) and release that.
 
 ## Cost Estimate
 
