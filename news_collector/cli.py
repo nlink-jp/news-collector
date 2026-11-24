@@ -6,6 +6,7 @@ import sys
 
 def main() -> None:
     parser = argparse.ArgumentParser(
+        prog="news-collector",
         description="News collection agent — collect, structure, tag, and summarize news articles",
     )
     subparsers = parser.add_subparsers(dest="command")
